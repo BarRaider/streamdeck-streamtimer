@@ -13,7 +13,7 @@ using System.Timers;
 namespace StreamTimer
 {
     [PluginActionId("com.barraider.streamcountdowntimer")]
-    public class StreamCountdownTimer : PluginBase
+    public class StreamCountdownTimerAction : PluginBase
     {
         private class PluginSettings
         {
@@ -23,10 +23,12 @@ namespace StreamTimer
                 {
                     ResumeOnClick = false,
                     Multiline = false,
+                    HourglassMode = false,
                     TimerFileName = String.Empty,
                     FilePrefix = String.Empty,
                     TimerInterval = "00:01:00",
-                    AlertColor = "#FF0000"
+                    AlertColor = "#FF0000",
+                    HourglassColor = "#000000"
                 };
 
                 return instance;
@@ -51,7 +53,13 @@ namespace StreamTimer
             [JsonProperty(PropertyName = "alertColor")]
             public string AlertColor { get; set; }
 
-            
+            [JsonProperty(PropertyName = "hourglassMode")]
+            public bool HourglassMode { get; set; }
+
+            [JsonProperty(PropertyName = "hourglassColor")]
+            public string HourglassColor { get; set; }
+
+
         }
 
         #region Private members
@@ -74,7 +82,7 @@ namespace StreamTimer
 
         #region PluginBase Methods
 
-        public StreamCountdownTimer(SDConnection connection, InitialPayload payload) : base(connection, payload)
+        public StreamCountdownTimerAction(SDConnection connection, InitialPayload payload) : base(connection, payload)
         {
             if (payload.Settings == null || payload.Settings.Count == 0)
             {
@@ -162,26 +170,29 @@ namespace StreamTimer
                 return;
             }
 
+            // Handle alerting
             total = TimerManager.Instance.GetTimerTime(timerId);
-            minutes = total / 60;
-            seconds = total % 60;
-            hours = minutes / 60;
-            minutes %= 60;
-
-            if (TimerManager.Instance.IsTimerEnabled(timerId))
-            {
-                string hoursStr = (hours > 0) ? $"{hours.ToString("00")}:" : "";
-                SaveTimerToFile($"{settings.FilePrefix}{hoursStr}{minutes.ToString("00")}:{seconds.ToString("00")}");
-            }
-
-            await Connection.SetTitleAsync($"{hours.ToString("00")}{delimiter}{minutes.ToString("00")}\n{seconds.ToString("00")}");
-
             if (total == 0 && !tmrAlert.Enabled)
             {
                 isAlerting = true;
                 tmrAlert.Start();
                 TimerManager.Instance.StopTimer(timerId);
             }
+
+            // Handle hourglass mode
+            if (settings.HourglassMode)
+            {
+                await DisplayHourglass();
+                return;
+            }
+
+            minutes = total / 60;
+            seconds = total % 60;
+            hours = minutes / 60;
+            minutes %= 60;
+
+            await Connection.SetImageAsync((string)null);
+            await Connection.SetTitleAsync($"{hours.ToString("00")}{delimiter}{minutes.ToString("00")}\n{seconds.ToString("00")}");
         }
 
         #endregion
@@ -190,13 +201,13 @@ namespace StreamTimer
 
         private void ResetTimer()
         {
-            TimerManager.Instance.ResetTimer(timerId, timerInterval);
+            TimerManager.Instance.ResetTimer(timerId, timerInterval, settings.TimerFileName, settings.FilePrefix);
         }
 
         private void ResumeTimer()
         {
             bool reset = !settings.ResumeOnClick;
-            TimerManager.Instance.StartTimer(timerId, reset, timerInterval);
+            TimerManager.Instance.StartTimer(timerId, reset, timerInterval, settings.TimerFileName, settings.FilePrefix);
         }
 
         private void CheckIfResetNeeded()
@@ -240,22 +251,6 @@ namespace StreamTimer
         private Task SaveSettings()
         {
             return Connection.SetSettingsAsync(JObject.FromObject(settings));
-        }
-
-        private void SaveTimerToFile(string text)
-        {
-            try
-            {
-                if (!String.IsNullOrWhiteSpace(settings.TimerFileName))
-                {
-
-                    File.WriteAllText(settings.TimerFileName, text);
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Instance.LogMessage(TracingLevel.ERROR, $"Error Saving value: {text} to counter file: {settings.TimerFileName} : {ex}");
-            }
         }
 
         private Color GenerateStageColor(string initialColor, int stage, int totalAmountOfStages)
@@ -308,6 +303,53 @@ namespace StreamTimer
             Connection.SetImageAsync(img);
 
             alertStage = (alertStage + 1) % TOTAL_ALERT_STAGES;
+        }
+
+        private Color GetHourglassColor(Color initialColor, double remainingPercentage)
+        {
+            if (initialColor.R != 0 || initialColor.G != 0 || initialColor.B != 0)
+            {
+                return initialColor;
+            }
+
+            if (remainingPercentage > 0.5)
+            {
+                return Color.Green;
+            }
+            else if (remainingPercentage > 0.20)
+            {
+                return Color.Yellow;
+            }
+            else
+            {
+                return Color.Red;
+            }
+        }
+
+        private async Task DisplayHourglass()
+        {
+            long totalSeconds = (long) timerInterval.TotalSeconds;
+            long remainingSeconds = TimerManager.Instance.GetTimerTime(timerId);
+
+            if (remainingSeconds <= 0)
+            {
+                return;
+            }
+
+            double remainingPercentage = (double)remainingSeconds / (double)totalSeconds;
+
+            Bitmap img = Tools.GenerateKeyImage(deviceType, out Graphics graphics);
+            int height = Tools.GetKeyDefaultHeight(deviceType);
+            int width = Tools.GetKeyDefaultWidth(deviceType);
+            int startHeight = height - (int)(height * remainingPercentage);
+
+            var color = GetHourglassColor(ColorTranslator.FromHtml(settings.HourglassColor), remainingPercentage);
+
+            // Background
+            var bgBrush = new SolidBrush(color);
+            graphics.FillRectangle(bgBrush, 0, startHeight , width, height);
+            await Connection.SetTitleAsync((string)null);
+            await Connection.SetImageAsync(img);
         }
 
         #endregion

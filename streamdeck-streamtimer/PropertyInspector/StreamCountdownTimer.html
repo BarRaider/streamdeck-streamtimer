@@ -17,6 +17,9 @@
             <div class="sdpi-item-label">Time</div>
             <input class="sdpi-item-value sdProperty" placeholder="00:05:00" value="" id="timerInterval" oninput="setSettings()">
         </div>
+        <details class="message">
+            <summary>Long press the key to reset the timer</summary>
+        </details>
         <div type="color" class="sdpi-item" id="dvAlert">
             <div class="sdpi-item-label">Alert Color</div>
             <input type="color" class="sdpi-item-value sdProperty" value="#FF0000" id="alertColor" oninput="setSettings()">
@@ -27,15 +30,8 @@
             <button class="sdpi-item-value max20 minmargin" onclick="setSettings()">Save</button>
         </div>
         <div class="sdpi-item" id="dvFilePrefix">
-            <div class="sdpi-item-label">File Prefix</div>
+            <div class="sdpi-item-label">File Title Prefix</div>
             <input class="sdpi-item-value sdProperty" placeholder="" value="" id="filePrefix" oninput="setSettings()">
-        </div>
-        <div type="checkbox" class="sdpi-item" id="MultilineStopwatch">
-            <div class="sdpi-item-label">Multiline</div>
-            <div class="sdpi-item-value">
-                <input id="multiline" type="checkbox" value="" class="sdProperty sdCheckbox" oninput="setSettings()">
-                <label for="multiline" class="sdpi-item-label"><span></span>3 different lines</label>
-            </div>
         </div>
         <div type="checkbox" class="sdpi-item" id="ClickResume">
             <div class="sdpi-item-label">Resume on click</div>
@@ -44,9 +40,27 @@
                 <label for="resumeOnClick" class="sdpi-item-label"><span></span>Unpausing does not reset</label>
             </div>
         </div>
+        <div type="checkbox" class="sdpi-item" id="dvHourglassMode">
+            <div class="sdpi-item-label">Hourglass mode</div>
+            <div class="sdpi-item-value">
+                <input id="hourglassMode" type="checkbox" value="" class="sdProperty sdCheckbox" oninput="setSettings()">
+                <label for="hourglassMode" class="sdpi-item-label"><span></span>Graphical timer representation</label>
+            </div>
+        </div>
+        <div type="color" class="sdpi-item" id="dvHourglassColor">
+            <div class="sdpi-item-label">Hourglass Color</div>
+            <input type="color" class="sdpi-item-value sdProperty" value="#000000" id="hourglassColor" oninput="setSettings()">
+        </div>
         <details class="message">
-            <summary>Long press the key to reset the timer</summary>
+            <summary>Use black for auto-color (Green->Yellow->Red)</summary>
         </details>
+        <div type="checkbox" class="sdpi-item" id="MultilineStopwatch">
+            <div class="sdpi-item-label">Multiline</div>
+            <div class="sdpi-item-value">
+                <input id="multiline" type="checkbox" value="" class="sdProperty sdCheckbox" oninput="setSettings()">
+                <label for="multiline" class="sdpi-item-label"><span></span>3 different lines</label>
+            </div>
+        </div>
     </div>
     <script src="sdtools.common.js"></script>
 </body>
