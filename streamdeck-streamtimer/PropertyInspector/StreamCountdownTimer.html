@@ -7,6 +7,8 @@
     <meta name=apple-mobile-web-app-status-bar-style content=black>
     <title>BarRaider's Stream Countdown Timer</title>
     <link rel="stylesheet" href="sdpi.css">
+    <script src="sdtools.common.js"></script>
+    <script src="StreamCountdownTimer.js"></script>
 </head>
 <body>
     <div class="sdpi-wrapper">
@@ -33,6 +35,17 @@
             <div class="sdpi-item-label">File Title Prefix</div>
             <input class="sdpi-item-value sdProperty" placeholder="" value="" id="filePrefix" oninput="setSettings()">
         </div>
+        <div class="sdpi-item" id="dvCountdownEndText">
+            <div class="sdpi-item-label">File text on countdown end</div>
+            <input class="sdpi-item-value sdProperty" placeholder="Time's up!" value="" id="countdownEndText" oninput="setSettings()">
+        </div>
+        <div type="checkbox" class="sdpi-item" id="dvClearFileOnReset">
+            <div class="sdpi-item-label">Clear on Reset</div>
+            <div class="sdpi-item-value">
+                <input id="clearFileOnReset" type="checkbox" value="" class="sdProperty sdCheckbox" oninput="setSettings()">
+                <label for="clearFileOnReset" class="sdpi-item-label"><span></span>Clear text file on reset</label>
+            </div>
+        </div>
         <div type="checkbox" class="sdpi-item" id="ClickResume">
             <div class="sdpi-item-label">Resume on click</div>
             <div class="sdpi-item-value">
@@ -51,8 +64,22 @@
             <div class="sdpi-item-label">Hourglass Color</div>
             <input type="color" class="sdpi-item-value sdProperty" value="#000000" id="hourglassColor" oninput="setSettings()">
         </div>
-        <details class="message">
+        <details class="message" id="dvHourglassMessage">
             <summary>Use black for auto-color (Green->Yellow->Red)</summary>
+        </details>
+        <div type="checkbox" class="sdpi-item" id="dvStreamathonMode">
+            <div class="sdpi-item-label">Streamathon mode</div>
+            <div class="sdpi-item-value">
+                <input id="streamathonMode" type="checkbox" value="" class="sdProperty sdCheckbox" oninput="setSettings()">
+                <label for="streamathonMode" class="sdpi-item-label"><span></span></label>
+            </div>
+        </div>
+        <div class="sdpi-item" id="dvStreamathonIncrement">
+            <div class="sdpi-item-label">Streamathon Increment</div>
+            <input class="sdpi-item-value sdProperty" placeholder="00:05:00" value="" id="streamathonIncrement" oninput="setSettings()">
+        </div>
+        <details class="message" id="dvStreamathonMessage">
+            <summary>In Streamathon mode, each press increases the time by set increment. Long press resets.</summary>
         </details>
         <div type="checkbox" class="sdpi-item" id="MultilineStopwatch">
             <div class="sdpi-item-label">Multiline</div>
@@ -62,6 +89,6 @@
             </div>
         </div>
     </div>
-    <script src="sdtools.common.js"></script>
+    
 </body>
 </html>

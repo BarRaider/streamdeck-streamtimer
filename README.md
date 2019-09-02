@@ -4,6 +4,12 @@ Set a timer on your Stream Deck, and have it shown on your Stream too. Will star
 
 **Author's website and contact information:** [https://barraider.github.io](https://barraider.github.io)
 
+## New in v1.2
+- :new2: `Streamathon Mode` - Increase the time left by a customizable interval on every key press. (Long click to reset).
+- Hourglass Mode now shows an indication on whether the timer is running or paused on every keypress
+- Customizable text to show on stream when the timer ends
+- Option to clear the text file (and thus remove from stream) when the timer ends
+
 ## Features
 - Countdown is written to file so you can display the remaining time on your stream
 - Supports adding a title prefix in the file (such as `Time left: `)

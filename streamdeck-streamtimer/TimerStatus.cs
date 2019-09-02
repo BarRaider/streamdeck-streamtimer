@@ -16,12 +16,18 @@ namespace StreamTimer
 
         public string FileTitlePrefix { get; set; }
 
+        internal string FileCountdownEndText { get; set; }
+
+        internal bool ClearFileOnReset { get; set; }
+
         public TimerStatus()
         {
             Counter = 0;
             IsEnabled = false;
             Filename = null;
             FileTitlePrefix = null;
+            FileCountdownEndText = null;
+            ClearFileOnReset = false;
         }
     }
 }

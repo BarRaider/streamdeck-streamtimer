@@ -13,6 +13,11 @@ using System.Timers;
 namespace StreamTimer
 {
     [PluginActionId("com.barraider.streamcountdowntimer")]
+
+    //---------------------------------------------------
+    //          BarRaider's Hall Of Fame
+    // Subscriber: TheLifeOfKB
+    //---------------------------------------------------
     public class StreamCountdownTimerAction : PluginBase
     {
         private class PluginSettings
@@ -24,11 +29,16 @@ namespace StreamTimer
                     ResumeOnClick = false,
                     Multiline = false,
                     HourglassMode = false,
+                    ClearFileOnReset = false,
+                    StreamathonMode = false,
                     TimerFileName = String.Empty,
                     FilePrefix = String.Empty,
+                    CountdownEndText = String.Empty,
                     TimerInterval = "00:01:00",
                     AlertColor = "#FF0000",
-                    HourglassColor = "#000000"
+                    HourglassColor = "#000000",
+                    StreamathonIncrement = String.Empty
+                    
                 };
 
                 return instance;
@@ -59,7 +69,17 @@ namespace StreamTimer
             [JsonProperty(PropertyName = "hourglassColor")]
             public string HourglassColor { get; set; }
 
+            [JsonProperty(PropertyName = "countdownEndText")]
+            public string CountdownEndText { get; set; }
 
+            [JsonProperty(PropertyName = "clearFileOnReset")]
+            public bool ClearFileOnReset { get; set; }
+
+            [JsonProperty(PropertyName = "streamathonMode")]
+            public bool StreamathonMode { get; set; }
+
+            [JsonProperty(PropertyName = "streamathonIncrement")]
+            public string StreamathonIncrement { get; set; }
         }
 
         #region Private members
@@ -76,7 +96,8 @@ namespace StreamTimer
         private DateTime keyPressStart;
         private readonly string timerId;
         private TimeSpan timerInterval;
-        private readonly StreamDeckDeviceType deviceType;
+        private TimeSpan streamathonIncrement;
+        private bool displayCurrentStatus = false;
 
         #endregion
 
@@ -96,8 +117,8 @@ namespace StreamTimer
             timerId = Connection.ContextId;
             tmrAlert.Interval = 200;
             tmrAlert.Elapsed += TmrAlert_Elapsed;
-            deviceType = Connection.DeviceInfo().Type;
             SetTimerInterval();
+            SetStreamahtonIncrement();
         }
 
         public override void Dispose()
@@ -109,10 +130,22 @@ namespace StreamTimer
 
         public override void ReceivedSettings(ReceivedSettingsPayload payload)
         {
+            bool clearOnReset = settings.ClearFileOnReset;
+            string countdownEndText = settings.CountdownEndText;
             // New in StreamDeck-Tools v2.0:
             Tools.AutoPopulateSettings(settings, payload.Settings);
 
+            if (clearOnReset != settings.ClearFileOnReset)
+            {
+                settings.CountdownEndText = String.Empty;
+            }
+            else if (countdownEndText != settings.CountdownEndText)
+            {
+                settings.ClearFileOnReset = false;
+            }
+
             SetTimerInterval();
+            SetStreamahtonIncrement();
             SaveSettings();
         }
 
@@ -123,6 +156,11 @@ namespace StreamTimer
             // Used for long press
             keyPressStart = DateTime.Now;
             keyPressed = true;
+
+            if (settings.HourglassMode)
+            {
+                displayCurrentStatus = true;
+            }
 
             Logger.Instance.LogMessage(TracingLevel.INFO, "Key Pressed");
 
@@ -135,18 +173,38 @@ namespace StreamTimer
                 return;
             }
 
-            if (TimerManager.Instance.IsTimerEnabled(timerId))
+            if (settings.StreamathonMode && TimerManager.Instance.IsTimerEnabled(timerId))
             {
-                PauseTimer();
-            }
-            else
-            {
-                if (!settings.ResumeOnClick)
+                // Increment the timer
+                if (streamathonIncrement.TotalSeconds > 0)
                 {
-                    ResetTimer();
+                    if (!TimerManager.Instance.IncrementTimer(timerId, streamathonIncrement))
+                    {
+                        Logger.Instance.LogMessage(TracingLevel.WARN, $"TimerManager IncrementTimer failed");
+                        await Connection.ShowAlert();
+                    }
                 }
+                else
+                {
+                    Logger.Instance.LogMessage(TracingLevel.WARN, $"Streamathon mode - Invalid Increment {settings.StreamathonIncrement}");
+                    await Connection.ShowAlert();
+                }
+            }
+            else // Either not in streamathon mode or timer is disabled
+            {
+                if (TimerManager.Instance.IsTimerEnabled(timerId))
+                {
+                    PauseTimer();
+                }
+                else
+                {
+                    if (!settings.ResumeOnClick)
+                    {
+                        ResetTimer();
+                    }
 
-                ResumeTimer();
+                    ResumeTimer();
+                }
             }
         }
 
@@ -183,6 +241,11 @@ namespace StreamTimer
             if (settings.HourglassMode)
             {
                 await DisplayHourglass();
+                if (displayCurrentStatus)
+                {
+                    displayCurrentStatus = false;
+                    await Connection.SetTitleAsync($"{(TimerManager.Instance.IsTimerEnabled(timerId) ? "▶️" : "||")}");
+                }
                 return;
             }
 
@@ -201,13 +264,26 @@ namespace StreamTimer
 
         private void ResetTimer()
         {
-            TimerManager.Instance.ResetTimer(timerId, timerInterval, settings.TimerFileName, settings.FilePrefix);
+            TimerManager.Instance.ResetTimer(new TimerSettings() {  TimerId = timerId,
+                                                                    CounterLength = timerInterval,
+                                                                    FileName = settings.TimerFileName,
+                                                                    FileTitlePrefix = settings.FilePrefix,
+                                                                    ResetOnStart = !settings.ResumeOnClick,
+                                                                    FileCountdownEndText = settings.CountdownEndText,
+                                                                    ClearFileOnReset = settings.ClearFileOnReset
+                                                                  });
         }
 
         private void ResumeTimer()
         {
-            bool reset = !settings.ResumeOnClick;
-            TimerManager.Instance.StartTimer(timerId, reset, timerInterval, settings.TimerFileName, settings.FilePrefix);
+            TimerManager.Instance.StartTimer(new TimerSettings() {  TimerId = timerId,
+                                                                    CounterLength = timerInterval,
+                                                                    FileName = settings.TimerFileName,
+                                                                    FileTitlePrefix = settings.FilePrefix,
+                                                                    ResetOnStart = !settings.ResumeOnClick,
+                                                                    FileCountdownEndText = settings.CountdownEndText,
+                                                                    ClearFileOnReset = settings.ClearFileOnReset
+                                                                   });
         }
 
         private void CheckIfResetNeeded()
@@ -227,6 +303,18 @@ namespace StreamTimer
         private void PauseTimer()
         {
             TimerManager.Instance.StopTimer(timerId);
+        }
+
+        private void SetStreamahtonIncrement()
+        {
+            streamathonIncrement = TimeSpan.Zero;
+            if (settings.StreamathonMode && !String.IsNullOrEmpty(settings.StreamathonIncrement))
+            {
+                if (!TimeSpan.TryParse(settings.StreamathonIncrement, out streamathonIncrement))
+                {
+                    Logger.Instance.LogMessage(TracingLevel.WARN, $"Invalid Streamathon Increment: {settings.StreamathonIncrement}");
+                }
+            }
         }
 
         private void SetTimerInterval()
@@ -279,27 +367,13 @@ namespace StreamTimer
 
         private void TmrAlert_Elapsed(object sender, ElapsedEventArgs e)
         {
-            Bitmap img = Tools.GenerateKeyImage(deviceType, out Graphics graphics);
-            int height = Tools.GetKeyDefaultHeight(deviceType);
-            int width = Tools.GetKeyDefaultWidth(deviceType);
+            Bitmap img = Tools.GenerateGenericKeyImage(out Graphics graphics);
+            int height = img.Height;
+            int width = img.Width;
 
             // Background
             var bgBrush = new SolidBrush(GenerateStageColor(settings.AlertColor, alertStage, TOTAL_ALERT_STAGES));
             graphics.FillRectangle(bgBrush, 0, 0, width, height);
-
-            /*
-            var font = new Font("Verdana", 50, FontStyle.Bold);
-            var fgBrush = Brushes.White;
-            SizeF stringSize = graphics.MeasureString(message, font);
-            float stringPos = 0;
-            float stringHeight = 54;
-            if (stringSize.Width < width)
-            {
-                stringPos = Math.Abs((width - stringSize.Width)) / 2;
-                stringHeight = Math.Abs((height - stringSize.Height)) / 2;
-            }
-            graphics.DrawString(message, font, fgBrush, new PointF(stringPos, stringHeight));
-            */
             Connection.SetImageAsync(img);
 
             alertStage = (alertStage + 1) % TOTAL_ALERT_STAGES;
@@ -338,9 +412,9 @@ namespace StreamTimer
 
             double remainingPercentage = (double)remainingSeconds / (double)totalSeconds;
 
-            Bitmap img = Tools.GenerateKeyImage(deviceType, out Graphics graphics);
-            int height = Tools.GetKeyDefaultHeight(deviceType);
-            int width = Tools.GetKeyDefaultWidth(deviceType);
+            Bitmap img = Tools.GenerateGenericKeyImage(out Graphics graphics);
+            int height = img.Height;
+            int width = img.Width;
             int startHeight = height - (int)(height * remainingPercentage);
 
             var color = GetHourglassColor(ColorTranslator.FromHtml(settings.HourglassColor), remainingPercentage);

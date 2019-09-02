@@ -56,23 +56,26 @@ namespace StreamTimer
 
         #region Public Methods
 
-        public void StartTimer(string timerId, bool resetOnStart, TimeSpan counterLength, string fileName, string fileTitlePrefix)
+        public void StartTimer(TimerSettings timerSettings)
         {
-            if (!dicTimers.ContainsKey(timerId))
+            if (!dicTimers.ContainsKey(timerSettings.TimerId))
             {
-                dicTimers[timerId] = new TimerStatus
+                dicTimers[timerSettings.TimerId] = new TimerStatus
                 {
-                    Counter = (int)counterLength.TotalSeconds,
-                    Filename = fileName,
-                    FileTitlePrefix = fileTitlePrefix
+                    Counter = (int)timerSettings.CounterLength.TotalSeconds,
+                    Filename = timerSettings.FileName,
+                    FileTitlePrefix = timerSettings.FileTitlePrefix,
+                    FileCountdownEndText = timerSettings.FileCountdownEndText,
+                    ClearFileOnReset = timerSettings.ClearFileOnReset
+                    
                 };
             }
 
-            if (resetOnStart || dicTimers[timerId].Counter <= 0)
+            if (timerSettings.ResetOnStart || dicTimers[timerSettings.TimerId].Counter <= 0)
             {
-                ResetTimer(timerId, counterLength, fileName, fileTitlePrefix);
+                ResetTimer(timerSettings);
             }
-            dicTimers[timerId].IsEnabled = true;
+            dicTimers[timerSettings.TimerId].IsEnabled = true;
         }
 
         public void StopTimer(string timerId)
@@ -83,15 +86,22 @@ namespace StreamTimer
             }
         }
 
-        public void ResetTimer(string timerId, TimeSpan counterLength, string fileName, string fileTitlePrefix)
+        public void ResetTimer(TimerSettings timerSettings)
         {
-            if (!dicTimers.ContainsKey(timerId))
+            if (!dicTimers.ContainsKey(timerSettings.TimerId))
             {
-                dicTimers[timerId] = new TimerStatus();
+                dicTimers[timerSettings.TimerId] = new TimerStatus();
             }
-            dicTimers[timerId].Counter = (int)counterLength.TotalSeconds;
-            dicTimers[timerId].Filename = fileName;
-            dicTimers[timerId].FileTitlePrefix = fileTitlePrefix;
+            dicTimers[timerSettings.TimerId].Counter = (int)timerSettings.CounterLength.TotalSeconds;
+            dicTimers[timerSettings.TimerId].Filename = timerSettings.FileName;
+            dicTimers[timerSettings.TimerId].FileTitlePrefix = timerSettings.FileTitlePrefix;
+            dicTimers[timerSettings.TimerId].FileCountdownEndText = timerSettings.FileCountdownEndText;
+            dicTimers[timerSettings.TimerId].ClearFileOnReset = timerSettings.ClearFileOnReset;
+
+            if (timerSettings.ClearFileOnReset)
+            {
+                SaveTimerToFile(timerSettings.FileName, String.Empty);
+            }
         }
 
         public long GetTimerTime(string timerId)
@@ -110,6 +120,16 @@ namespace StreamTimer
                 return false;
             }
             return dicTimers[timerId].IsEnabled;
+        }
+
+        public bool IncrementTimer(string timerId, TimeSpan increment)
+        {
+            if (!dicTimers.ContainsKey(timerId))
+            {
+                return false;
+            }
+            dicTimers[timerId].Counter += (int)increment.TotalSeconds;
+            return true;
         }
 
         #endregion
@@ -162,6 +182,17 @@ namespace StreamTimer
 
             
             total = counterData.Counter;
+            if (total == 0 && !String.IsNullOrEmpty(counterData.FileCountdownEndText))
+            {
+                SaveTimerToFile(counterData.Filename, counterData.FileCountdownEndText);
+                return;
+            }
+            else if (total == 0 && counterData.ClearFileOnReset)
+            {
+                SaveTimerToFile(counterData.Filename, String.Empty);
+                return;
+            }
+
             minutes = total / 60;
             seconds = total % 60;
             hours = minutes / 60;
