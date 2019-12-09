@@ -1,4 +1,5 @@
 ﻿using BarRaider.SdTools;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -15,8 +16,10 @@ namespace StreamTimer
         private static TimerManager instance = null;
         private static readonly object objLock = new object();
 
-        private readonly Dictionary<string, TimerStatus> dicTimers = new Dictionary<string, TimerStatus>();
         private readonly Timer tmrTimerCounter;
+        private Dictionary<string, TimerStatus> dicTimers = new Dictionary<string, TimerStatus>();
+        private GlobalSettings global;
+
 
         #endregion
 
@@ -42,14 +45,35 @@ namespace StreamTimer
             }
         }
 
+        public bool IsInitialized { get; private set; }
+
         private TimerManager()
         {
+            IsInitialized = false;
             tmrTimerCounter = new Timer
             {
                 Interval = 1000
             };
             tmrTimerCounter.Elapsed += TmrTimerCounter_Elapsed;
-            tmrTimerCounter.Start();
+            GlobalSettingsManager.Instance.OnReceivedGlobalSettings += Instance_OnReceivedGlobalSettings;
+            GlobalSettingsManager.Instance.RequestGlobalSettings();
+        }
+
+        private void Instance_OnReceivedGlobalSettings(object sender, ReceivedGlobalSettingsPayload payload)
+        {
+            if (payload?.Settings != null && payload.Settings.Count > 0)
+            {
+                global = payload.Settings.ToObject<GlobalSettings>();
+                dicTimers = global.DicTimers;
+            }
+
+            if (!tmrTimerCounter.Enabled)
+            {
+                tmrTimerCounter.Start();
+            }
+            HandleElapsedTimers();
+
+            IsInitialized = true;
         }
 
         #endregion
@@ -62,27 +86,34 @@ namespace StreamTimer
             {
                 dicTimers[timerSettings.TimerId] = new TimerStatus
                 {
-                    Counter = (int)timerSettings.CounterLength.TotalSeconds,
+                    EndTime = DateTime.Now + timerSettings.CounterLength,
                     Filename = timerSettings.FileName,
                     FileTitlePrefix = timerSettings.FileTitlePrefix,
                     FileCountdownEndText = timerSettings.FileCountdownEndText,
                     ClearFileOnReset = timerSettings.ClearFileOnReset
-                    
                 };
             }
+            else // We were paused, modify time left based on current time
+            {
+                dicTimers[timerSettings.TimerId].EndTime = DateTime.Now.AddSeconds(dicTimers[timerSettings.TimerId].PausedTimeLeft);
+            }
 
-            if (timerSettings.ResetOnStart || dicTimers[timerSettings.TimerId].Counter <= 0)
+            if (timerSettings.ResetOnStart || SecondsLeft(timerSettings.TimerId) <= 0)
             {
                 ResetTimer(timerSettings);
             }
             dicTimers[timerSettings.TimerId].IsEnabled = true;
+            SaveTimers();
         }
 
         public void StopTimer(string timerId)
         {
             if (dicTimers.ContainsKey(timerId))
             {
+                CheckWriteTimerToFile(timerId);
                 dicTimers[timerId].IsEnabled = false;
+                dicTimers[timerId].PausedTimeLeft = Math.Max(SecondsLeft(timerId),0);
+                SaveTimers();
             }
         }
 
@@ -92,11 +123,13 @@ namespace StreamTimer
             {
                 dicTimers[timerSettings.TimerId] = new TimerStatus();
             }
-            dicTimers[timerSettings.TimerId].Counter = (int)timerSettings.CounterLength.TotalSeconds;
+            dicTimers[timerSettings.TimerId].EndTime = DateTime.Now + timerSettings.CounterLength;
             dicTimers[timerSettings.TimerId].Filename = timerSettings.FileName;
             dicTimers[timerSettings.TimerId].FileTitlePrefix = timerSettings.FileTitlePrefix;
             dicTimers[timerSettings.TimerId].FileCountdownEndText = timerSettings.FileCountdownEndText;
             dicTimers[timerSettings.TimerId].ClearFileOnReset = timerSettings.ClearFileOnReset;
+            dicTimers[timerSettings.TimerId].PausedTimeLeft = 0;
+            SaveTimers();
 
             if (timerSettings.ClearFileOnReset)
             {
@@ -110,7 +143,15 @@ namespace StreamTimer
             {
                 return 0;
             }
-            return dicTimers[timerId].Counter;
+
+            if (IsTimerEnabled(timerId))
+            {
+                return SecondsLeft(timerId);
+            }
+            else
+            {
+                return dicTimers[timerId].PausedTimeLeft;
+            }           
         }
 
         public bool IsTimerEnabled(string timerId)
@@ -128,7 +169,8 @@ namespace StreamTimer
             {
                 return false;
             }
-            dicTimers[timerId].Counter += (int)increment.TotalSeconds;
+            dicTimers[timerId].EndTime += increment;
+            SaveTimers();
             return true;
         }
 
@@ -140,17 +182,7 @@ namespace StreamTimer
         {
             foreach (string key in dicTimers.Keys)
             {
-                if (dicTimers[key].IsEnabled)
-                {
-                    dicTimers[key].Counter--;
-
-                    if (dicTimers[key].Counter < 0)
-                    {
-                        dicTimers[key].Counter = 0;
-                    }
-
-                    WriteCounterToFile(key);
-                }
+                CheckWriteTimerToFile(key);
             }
         }
 
@@ -170,27 +202,44 @@ namespace StreamTimer
             }
         }
 
-        private void WriteCounterToFile(string counterKey)
+        private void CheckWriteTimerToFile(string timerKey)
+        {
+            if (dicTimers[timerKey].IsEnabled)
+            {
+                int secondsLeft = SecondsLeft(timerKey);
+                if (secondsLeft < 0)
+                {
+                    secondsLeft = 0;
+                }
+
+                WriteCounterToFile(timerKey);
+            }
+        }
+
+        private void WriteCounterToFile(string timerKey)
         {
             long total, minutes, seconds, hours;
-            var counterData = dicTimers[counterKey];
+            var counterData = dicTimers[timerKey];
 
             if (String.IsNullOrEmpty(counterData.Filename))
             {
                 return;
             }
-
             
-            total = counterData.Counter;
-            if (total == 0 && !String.IsNullOrEmpty(counterData.FileCountdownEndText))
+            total = SecondsLeft(timerKey);
+            if (total <= 0 && !String.IsNullOrEmpty(counterData.FileCountdownEndText))
             {
                 SaveTimerToFile(counterData.Filename, counterData.FileCountdownEndText);
                 return;
             }
-            else if (total == 0 && counterData.ClearFileOnReset)
+            else if (total <= 0 && counterData.ClearFileOnReset)
             {
                 SaveTimerToFile(counterData.Filename, String.Empty);
                 return;
+            }
+            else if (total < 0)
+            {
+                total = 0;
             }
 
             minutes = total / 60;
@@ -198,8 +247,44 @@ namespace StreamTimer
             hours = minutes / 60;
             minutes %= 60;
 
-            string hoursStr = (hours > 0) ? $"{hours.ToString("00")}:" : "";
+            string hoursStr = (hours > 0) ? $"{hours.ToString("0")}:" : "";
             SaveTimerToFile(counterData.Filename, $"{counterData.FileTitlePrefix}{hoursStr}{minutes.ToString("00")}:{seconds.ToString("00")}");
+        }
+
+        private int SecondsLeft(string counterKey)
+        {
+            if (!dicTimers.ContainsKey(counterKey))
+            {
+                return -1;
+            }
+
+            return (int)(dicTimers[counterKey].EndTime - DateTime.Now).TotalSeconds;
+        }
+
+        private void SaveTimers()
+        {
+            if (global == null)
+            {
+                global = new GlobalSettings();
+            }
+            global.DicTimers = dicTimers;
+            GlobalSettingsManager.Instance.SetGlobalSettings(JObject.FromObject(global));
+        }
+
+        private void HandleElapsedTimers()
+        {
+            foreach (string key in dicTimers.Keys)
+            {
+                if (dicTimers[key].IsEnabled)
+                {
+                    int secondsLeft = SecondsLeft(key);
+                    if (secondsLeft < 0)
+                    {
+                        dicTimers[key].IsEnabled = false;
+                        dicTimers[key].PausedTimeLeft = 0;
+                    }
+                }
+            }
         }
 
         #endregion

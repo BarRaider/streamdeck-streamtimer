@@ -23,12 +23,17 @@ function showHideSettings(payload) {
     console.log("Show Hide Settings Called");
     setHourglass("none");
     setStreamathon("none");
+    setSoundOnEndSettings("none");
     if (payload['hourglassMode']) {
         setHourglass("");
     }
 
     if (payload['streamathonMode']) {
         setStreamathon("");
+    }
+
+    if (payload['playSoundOnEnd']) {
+        setSoundOnEndSettings("");
     }
 }
 
@@ -45,3 +50,9 @@ function setStreamathon(displayValue) {
     dvStreamathonIncrement.style.display = displayValue;
     dvStreamathonMessage.style.display = displayValue;
 }
+
+function setSoundOnEndSettings(displayValue) {
+    var dvSoundOnEndSettings = document.getElementById('dvSoundOnEndSettings');
+    dvSoundOnEndSettings.style.display = displayValue;
+}
+

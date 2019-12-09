@@ -1,6 +1,8 @@
 ﻿using BarRaider.SdTools;
+using NAudio.Wave;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using StreamTimer.Wrappers;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -17,6 +19,8 @@ namespace StreamTimer
     //---------------------------------------------------
     //          BarRaider's Hall Of Fame
     // Subscriber: TheLifeOfKB
+    // 300 Bits: Nachtmeister666
+    // Icessassin - Tip: $20.02
     //---------------------------------------------------
     public class StreamCountdownTimerAction : PluginBase
     {
@@ -31,14 +35,17 @@ namespace StreamTimer
                     HourglassMode = false,
                     ClearFileOnReset = false,
                     StreamathonMode = false,
+                    PlaySoundOnEnd = false,
                     TimerFileName = String.Empty,
                     FilePrefix = String.Empty,
                     CountdownEndText = String.Empty,
                     TimerInterval = "00:01:00",
                     AlertColor = "#FF0000",
                     HourglassColor = "#000000",
-                    StreamathonIncrement = String.Empty
-                    
+                    StreamathonIncrement = String.Empty,
+                    PlaybackDevice = String.Empty,
+                    PlaybackDevices = null,
+                    PlaySoundOnEndFile = String.Empty
                 };
 
                 return instance;
@@ -80,6 +87,20 @@ namespace StreamTimer
 
             [JsonProperty(PropertyName = "streamathonIncrement")]
             public string StreamathonIncrement { get; set; }
+
+            [JsonProperty(PropertyName = "playSoundOnEnd")]
+            public bool PlaySoundOnEnd { get; set; }
+
+            [JsonProperty(PropertyName = "playbackDevices")]
+            public List<PlaybackDevice> PlaybackDevices { get; set; }
+
+            [JsonProperty(PropertyName = "playbackDevice")]
+            public string PlaybackDevice { get; set; }
+
+            [FilenameProperty]
+            [JsonProperty(PropertyName = "playSoundOnEndFile")]
+            public string PlaySoundOnEndFile { get; set; }
+
         }
 
         #region Private members
@@ -114,15 +135,16 @@ namespace StreamTimer
             {
                 this.settings = payload.Settings.ToObject<PluginSettings>();
             }
+            Connection.StreamDeckConnection.OnSendToPlugin += StreamDeckConnection_OnSendToPlugin;
             timerId = Connection.ContextId;
             tmrAlert.Interval = 200;
             tmrAlert.Elapsed += TmrAlert_Elapsed;
-            SetTimerInterval();
-            SetStreamahtonIncrement();
+            InitializeSettings();
         }
 
         public override void Dispose()
         {
+            Connection.StreamDeckConnection.OnSendToPlugin -= StreamDeckConnection_OnSendToPlugin;
             tmrAlert.Elapsed -= TmrAlert_Elapsed;
             tmrAlert.Stop();
             Logger.Instance.LogMessage(TracingLevel.INFO, "Destructor called");
@@ -143,9 +165,7 @@ namespace StreamTimer
             {
                 settings.ClearFileOnReset = false;
             }
-
-            SetTimerInterval();
-            SetStreamahtonIncrement();
+            InitializeSettings();
             SaveSettings();
         }
 
@@ -230,17 +250,23 @@ namespace StreamTimer
 
             // Handle alerting
             total = TimerManager.Instance.GetTimerTime(timerId);
-            if (total == 0 && !tmrAlert.Enabled)
+            if (total <= 0 && !TimerManager.Instance.IsTimerEnabled(timerId)) // Time passed before 
             {
+                total = (int)timerInterval.TotalSeconds;
+            }
+            else if (total <= 0 && !tmrAlert.Enabled) // Timer running, need to alert
+            {
+                total = 0;
                 isAlerting = true;
                 tmrAlert.Start();
                 TimerManager.Instance.StopTimer(timerId);
+                PlaySoundOnEnd();
             }
 
             // Handle hourglass mode
             if (settings.HourglassMode)
             {
-                await DisplayHourglass();
+                await DisplayHourglass(total);
                 if (displayCurrentStatus)
                 {
                     displayCurrentStatus = false;
@@ -255,7 +281,13 @@ namespace StreamTimer
             minutes %= 60;
 
             await Connection.SetImageAsync((string)null);
-            await Connection.SetTitleAsync($"{hours.ToString("00")}{delimiter}{minutes.ToString("00")}\n{seconds.ToString("00")}");
+            string hoursStr = (hours > 0) ? $"{hours.ToString("0")}{delimiter}" : "";
+            string secondsDelimiter = delimiter;
+            if (!String.IsNullOrEmpty(hoursStr))
+            {
+                secondsDelimiter = "\n";
+            }
+            await Connection.SetTitleAsync($"{hoursStr}{minutes.ToString("00")}{secondsDelimiter}{seconds.ToString("00")}");
         }
 
         #endregion
@@ -264,26 +296,30 @@ namespace StreamTimer
 
         private void ResetTimer()
         {
-            TimerManager.Instance.ResetTimer(new TimerSettings() {  TimerId = timerId,
-                                                                    CounterLength = timerInterval,
-                                                                    FileName = settings.TimerFileName,
-                                                                    FileTitlePrefix = settings.FilePrefix,
-                                                                    ResetOnStart = !settings.ResumeOnClick,
-                                                                    FileCountdownEndText = settings.CountdownEndText,
-                                                                    ClearFileOnReset = settings.ClearFileOnReset
-                                                                  });
+            TimerManager.Instance.ResetTimer(new TimerSettings()
+            {
+                TimerId = timerId,
+                CounterLength = timerInterval,
+                FileName = settings.TimerFileName,
+                FileTitlePrefix = settings.FilePrefix,
+                ResetOnStart = !settings.ResumeOnClick,
+                FileCountdownEndText = settings.CountdownEndText,
+                ClearFileOnReset = settings.ClearFileOnReset
+            });
         }
 
         private void ResumeTimer()
         {
-            TimerManager.Instance.StartTimer(new TimerSettings() {  TimerId = timerId,
-                                                                    CounterLength = timerInterval,
-                                                                    FileName = settings.TimerFileName,
-                                                                    FileTitlePrefix = settings.FilePrefix,
-                                                                    ResetOnStart = !settings.ResumeOnClick,
-                                                                    FileCountdownEndText = settings.CountdownEndText,
-                                                                    ClearFileOnReset = settings.ClearFileOnReset
-                                                                   });
+            TimerManager.Instance.StartTimer(new TimerSettings()
+            {
+                TimerId = timerId,
+                CounterLength = timerInterval,
+                FileName = settings.TimerFileName,
+                FileTitlePrefix = settings.FilePrefix,
+                ResetOnStart = !settings.ResumeOnClick,
+                FileCountdownEndText = settings.CountdownEndText,
+                ClearFileOnReset = settings.ClearFileOnReset
+            });
         }
 
         private void CheckIfResetNeeded()
@@ -377,6 +413,7 @@ namespace StreamTimer
             Connection.SetImageAsync(img);
 
             alertStage = (alertStage + 1) % TOTAL_ALERT_STAGES;
+            graphics.Dispose();
         }
 
         private Color GetHourglassColor(Color initialColor, double remainingPercentage)
@@ -400,10 +437,9 @@ namespace StreamTimer
             }
         }
 
-        private async Task DisplayHourglass()
+        private async Task DisplayHourglass(long remainingSeconds)
         {
-            long totalSeconds = (long) timerInterval.TotalSeconds;
-            long remainingSeconds = TimerManager.Instance.GetTimerTime(timerId);
+            long totalSeconds = (long)timerInterval.TotalSeconds;
 
             if (remainingSeconds <= 0)
             {
@@ -421,12 +457,135 @@ namespace StreamTimer
 
             // Background
             var bgBrush = new SolidBrush(color);
-            graphics.FillRectangle(bgBrush, 0, startHeight , width, height);
+            graphics.FillRectangle(bgBrush, 0, startHeight, width, height);
             await Connection.SetTitleAsync((string)null);
             await Connection.SetImageAsync(img);
+            graphics.Dispose();
+        }
+
+        private void InitializeSettings()
+        {
+            Task.Run(() =>
+            {
+                int retries = 60;
+                while (!TimerManager.Instance.IsInitialized && retries > 0)
+                {
+                    retries--;
+                    System.Threading.Thread.Sleep(1000);
+                }
+                SetTimerInterval();
+                SetStreamahtonIncrement();
+                PropagatePlaybackDevices();
+            });
+        }
+
+        private void PropagatePlaybackDevices()
+        {
+            settings.PlaybackDevices = new List<PlaybackDevice>();
+
+            try
+            {
+                if (settings.PlaySoundOnEnd)
+                {
+                    for (int idx = -1; idx < WaveOut.DeviceCount; idx++)
+                    {
+                        var currDevice = WaveOut.GetCapabilities(idx);
+                        settings.PlaybackDevices.Add(new PlaybackDevice() { ProductName = currDevice.ProductName });
+                    }
+
+                    settings.PlaybackDevices = settings.PlaybackDevices.OrderBy(p => p.ProductName).ToList();
+                    SaveSettings();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Instance.LogMessage(TracingLevel.ERROR, $"Error propagating playback devices {ex}");
+            }
+        }
+
+        private Task PlaySoundOnEnd()
+        {
+            return Task.Run(() =>
+            {
+                // Q98NF-KR5LZ-DWBAB
+                if (!settings.PlaySoundOnEnd)
+                {
+                    return;
+                }
+
+                if (String.IsNullOrEmpty(settings.PlaySoundOnEndFile) || string.IsNullOrEmpty(settings.PlaybackDevice))
+                {
+                    Logger.Instance.LogMessage(TracingLevel.WARN, $"PlaySoundOnEnd called but File or Playback device are empty. File: {settings.PlaySoundOnEndFile} Device: {settings.PlaybackDevice}");
+                    return;
+                }
+
+                if (!File.Exists(settings.PlaySoundOnEndFile))
+                {
+                    Logger.Instance.LogMessage(TracingLevel.WARN, $"PlaySoundOnEnd called but file does not exist: {settings.PlaySoundOnEndFile}");
+                    return;
+                }
+
+                Logger.Instance.LogMessage(TracingLevel.INFO, $"PlaySoundOnEnd called. Playing {settings.PlaySoundOnEndFile} on device: {settings.PlaybackDevice}");
+                var deviceNumber = GetPlaybackDeviceFromDeviceName(settings.PlaybackDevice); using (var audioFile = new AudioFileReader(settings.PlaySoundOnEndFile))
+                {
+                    using (var outputDevice = new WaveOutEvent())
+                    {
+                        outputDevice.DeviceNumber = deviceNumber;
+                        outputDevice.Init(audioFile);
+                        outputDevice.Play();
+                        while (outputDevice.PlaybackState == PlaybackState.Playing)
+                        {
+                            System.Threading.Thread.Sleep(1000);
+                        }
+                    }
+                }
+            });
+        }
+
+        private int GetPlaybackDeviceFromDeviceName(string deviceName)
+        {
+            for (int idx = -1; idx < WaveOut.DeviceCount; idx++)
+            {
+                var currDevice = WaveOut.GetCapabilities(idx);
+                if (deviceName == currDevice.ProductName)
+                {
+                    return idx;
+                }
+            }
+            return -1;
+        }
+
+        private void StreamDeckConnection_OnSendToPlugin(object sender, streamdeck_client_csharp.StreamDeckEventReceivedEventArgs<streamdeck_client_csharp.Events.SendToPluginEvent> e)
+        {
+            var payload = e.Event.Payload;
+            if (Connection.ContextId != e.Event.Context)
+            {
+                return;
+            }
+
+            Logger.Instance.LogMessage(TracingLevel.INFO, "OnSendToPlugin called");
+            if (payload["property_inspector"] != null)
+            {
+                switch (payload["property_inspector"].ToString().ToLower())
+                {
+                    case "loadsavepicker":
+                        string propertyName = (string)payload["property_name"];
+                        string pickerTitle = (string)payload["picker_title"];
+                        string pickerFilter = (string)payload["picker_filter"];
+                        string fileName = PickersUtil.Pickers.SaveFilePicker(pickerTitle, null, pickerFilter);
+                        if (!string.IsNullOrEmpty(fileName))
+                        {
+                            if (!PickersUtil.Pickers.SetJsonPropertyValue(settings, propertyName, fileName))
+                            {
+                                Logger.Instance.LogMessage(TracingLevel.ERROR, "Failed to save picker value to settings");
+                            }
+                            SaveSettings();
+                        }
+                        break;
+                }
+            }
         }
 
         #endregion
     }
 }
-;

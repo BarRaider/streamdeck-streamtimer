@@ -28,8 +28,8 @@
         </div>
         <div class="sdpi-item" id="dvTimerFileName">
             <div class="sdpi-item-label">File Name</div>
-            <input class="sdpi-item-value sdProperty" placeholder="c:\temp\mycounter.txt" value="" id="timerFileName">
-            <button class="sdpi-item-value max20 minmargin" onclick="setSettings()">Save</button>
+            <input class="sdpi-item-value sdProperty hasFileButton" disabled value="" id="timerFileName">
+            <button class="max100 minmargin" onclick="openSaveFilePicker('Timer File Name', 'Text files (*.txt)|*.txt|All files (*.*)|*.*', 'timerFileName');">...</button>
         </div>
         <div class="sdpi-item" id="dvFilePrefix">
             <div class="sdpi-item-label">File Title Prefix</div>
@@ -38,6 +38,27 @@
         <div class="sdpi-item" id="dvCountdownEndText">
             <div class="sdpi-item-label">File text on countdown end</div>
             <input class="sdpi-item-value sdProperty" placeholder="Time's up!" value="" id="countdownEndText" oninput="setSettings()">
+        </div>
+        <div type="checkbox" class="sdpi-item" id="dvSoundOnEnd">
+            <div class="sdpi-item-label">Sound</div>
+            <div class="sdpi-item-value">
+                <input id="playSoundOnEnd" type="checkbox" value="" class="sdProperty sdCheckbox" oninput="setSettings()">
+                <label for="playSoundOnEnd" class="sdpi-item-label"><span></span>Play sound when timer ends</label>
+            </div>
+        </div>
+        <div id="dvSoundOnEndSettings">
+            <div class="sdpi-item" id="dvPlaybackDevices">
+                <div class="sdpi-item-label">Playback Device</div>
+                <select class="sdpi-item-value select sdProperty sdList" id="playbackDevices" oninput="setSettings()" sdListTextProperty="name" sdListValueProperty="name" sdValueField="playbackDevice"></select>
+            </div>
+            <div class="sdpi-item" id="dvSoundFile">
+                <div class="sdpi-item-label">Sound File</div>
+                <div class="sdpi-item-group file" id="filepickergroup">
+                    <input class="sdpi-item-value sdProperty sdFile" type="file" id="playSoundOnEndFile" accept=".wav, .mp3, .ogg, .wma, .aac, .mp4" oninput="setSettings()">
+                    <label class="sdpi-file-info " for="playSoundOnEndFile" id="playSoundOnEndFileFilename">No file...</label>
+                    <label class="sdpi-file-label" for="playSoundOnEndFile">Choose file...</label>
+                </div>
+            </div>
         </div>
         <div type="checkbox" class="sdpi-item" id="dvClearFileOnReset">
             <div class="sdpi-item-label">Clear on Reset</div>

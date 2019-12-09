@@ -17,11 +17,11 @@
     }
   ],
   "Author": "BarRaider",
-  "Description": "Set a timer on your Stream Deck, and have it shown on your Stream too. Will start flashing in a color of your choice when the time is up.\nNew: Streamathon mode - increase the time left on every key press",
+  "Description": "Set a timer on your Stream Deck, and have it shown on your Stream too. Will start flashing in a color of your choice when the time is up.\nNew: Sound Support! Streamathon mode - increase the time left on every key press",
   "Name": "Stream Countdown Timer",
   "Icon": "Images/pluginIcon",
   "URL": "https://BarRaider.com/",
-  "Version": "1.2",
+  "Version": "1.3",
   "CodePath": "com.barraider.streamcountdowntimer",
   "Category": "BarRaider",
   "CategoryIcon": "Images/categoryIcon",

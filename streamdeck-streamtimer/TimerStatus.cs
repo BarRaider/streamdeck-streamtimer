@@ -8,7 +8,7 @@ namespace StreamTimer
 {
     public class TimerStatus
     {
-        public long Counter { get; set; }
+        public DateTime EndTime { get; set; }
 
         public bool IsEnabled { get; set; }
 
@@ -16,18 +16,21 @@ namespace StreamTimer
 
         public string FileTitlePrefix { get; set; }
 
-        internal string FileCountdownEndText { get; set; }
+        public string FileCountdownEndText { get; set; }
 
-        internal bool ClearFileOnReset { get; set; }
+        public bool ClearFileOnReset { get; set; }
+
+        public int PausedTimeLeft { get; set; }
 
         public TimerStatus()
         {
-            Counter = 0;
+            EndTime = DateTime.Now;
             IsEnabled = false;
             Filename = null;
             FileTitlePrefix = null;
             FileCountdownEndText = null;
             ClearFileOnReset = false;
+            PausedTimeLeft = 0;
         }
     }
 }

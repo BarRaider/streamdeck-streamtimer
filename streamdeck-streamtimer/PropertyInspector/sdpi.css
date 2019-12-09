@@ -1471,3 +1471,7 @@ input[type=range].vHorizon {
   margin: 4px 0px;
 }
 */
+
+.hasFileButton {
+    margin-right: 4px;
+}
