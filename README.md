@@ -4,6 +4,9 @@ Set a timer on your Stream Deck, and have it shown on your Stream too. Will star
 
 **Author's website and contact information:** [https://barraider.github.io](https://barraider.github.io)
 
+## New in v1.4
+- Multi-Action support
+
 ## New in v1.3
 - SOUND SUPPORT :PogChamp: You can now choose a sound that will be played when the timer ends.  Choosing the playback device allows you to send the sound directly to your stream.
 - Improved UI to allow setting the filename using a file picker
