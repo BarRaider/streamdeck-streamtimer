@@ -2,7 +2,7 @@
 
 Set a timer on your Stream Deck, and have it shown on your Stream too. Will start flashing in a color of your choice when the time is up.
 
-**Author's website and contact information:** [https://barraider.github.io](https://barraider.github.io)
+**Author's website and contact information:** [https://barraider.com](https://barraider.com)
 
 ## New in v1.4
 - Multi-Action support
@@ -30,10 +30,10 @@ Set a timer on your Stream Deck, and have it shown on your Stream too. Will star
 * [Download plugin](https://github.com/BarRaider/streamdeck-streamtimer/releases/)
 
 ## I found a bug, who do I contact?
-For support please contact the developer. Contact information is available at https://barraider.github.io
+For support please contact the developer. Contact information is available at https://barraider.com
 
 ## I have a feature request, who do I contact?
-Please contact the developer. Contact information is available at https://barraider.github.io
+Please contact the developer. Contact information is available at https://barraider.com
 
 ## Dependencies
 * Uses StreamDeck-Tools by BarRaider: [![NuGet](https://img.shields.io/nuget/v/streamdeck-tools.svg?style=flat)](https://www.nuget.org/packages/streamdeck-tools)
