@@ -21,6 +21,7 @@ namespace StreamTimer
     // Subscriber: TheLifeOfKB
     // 300 Bits: Nachtmeister666
     // Icessassin - Tip: $20.02
+    // onemousegaming - Tip: $3.50
     //---------------------------------------------------
     public class StreamCountdownTimerAction : PluginBase
     {
@@ -45,7 +46,10 @@ namespace StreamTimer
                     StreamathonIncrement = String.Empty,
                     PlaybackDevice = String.Empty,
                     PlaybackDevices = null,
-                    PlaySoundOnEndFile = String.Empty
+                    PlaySoundOnEndFile = String.Empty,
+                    PauseImageFile = String.Empty,
+                    HourglassTime = false,
+                    HourglassImageMode = false
                 };
 
                 return instance;
@@ -101,6 +105,15 @@ namespace StreamTimer
             [JsonProperty(PropertyName = "playSoundOnEndFile")]
             public string PlaySoundOnEndFile { get; set; }
 
+            [FilenameProperty]
+            [JsonProperty(PropertyName = "pauseImageFile")]
+            public string PauseImageFile { get; set; }
+
+            [JsonProperty(PropertyName = "hourglassTime")]
+            public bool HourglassTime { get; set; }
+
+            [JsonProperty(PropertyName = "hourglassImageMode")]
+            public bool HourglassImageMode { get; set; }
         }
 
         #region Private members
@@ -119,6 +132,8 @@ namespace StreamTimer
         private TimeSpan timerInterval;
         private TimeSpan streamathonIncrement;
         private bool displayCurrentStatus = false;
+        private Image pauseImage = null;
+        private bool stopPlayback = false;
 
         #endregion
 
@@ -188,6 +203,7 @@ namespace StreamTimer
             {
                 isAlerting = false;
                 tmrAlert.Stop();
+                StopPlayback();
                 ResetTimer();
                 await Connection.SetImageAsync((string)null);
                 return;
@@ -236,8 +252,7 @@ namespace StreamTimer
 
         public async override void OnTick()
         {
-            long total, minutes, seconds, hours;
-            string delimiter = settings.Multiline ? "\n" : ":";
+            long total;
 
             // Stream Deck calls this function every second, 
             // so this is the best place to determine if we need to reset (versus the internal timer which may be paused)
@@ -263,6 +278,13 @@ namespace StreamTimer
                 PlaySoundOnEnd();
             }
 
+            if (!TimerManager.Instance.IsTimerEnabled(timerId) && pauseImage != null)
+            {
+                await Connection.SetImageAsync(pauseImage);
+                await Connection.SetTitleAsync((string)null);
+                return;
+            }
+
             // Handle hourglass mode
             if (settings.HourglassMode)
             {
@@ -272,15 +294,31 @@ namespace StreamTimer
                     displayCurrentStatus = false;
                     await Connection.SetTitleAsync($"{(TimerManager.Instance.IsTimerEnabled(timerId) ? "▶️" : "||")}");
                 }
-                return;
+                if (settings.HourglassTime)
+                {
+                    await ShowTimeOnKey(total);
+                }
             }
+            else // Not Hourglass mode
+            {
+                await Connection.SetImageAsync((string)null);
+                await ShowTimeOnKey(total);
+            }
+        }
 
+        #endregion
+
+        #region Private methods
+
+        private async Task ShowTimeOnKey(long total)
+        {
+            long minutes, seconds, hours;
+            string delimiter = settings.Multiline ? "\n" : ":";
             minutes = total / 60;
             seconds = total % 60;
             hours = minutes / 60;
             minutes %= 60;
 
-            await Connection.SetImageAsync((string)null);
             string hoursStr = (hours > 0) ? $"{hours.ToString("0")}{delimiter}" : "";
             string secondsDelimiter = delimiter;
             if (!String.IsNullOrEmpty(hoursStr))
@@ -289,10 +327,6 @@ namespace StreamTimer
             }
             await Connection.SetTitleAsync($"{hoursStr}{minutes.ToString("00")}{secondsDelimiter}{seconds.ToString("00")}");
         }
-
-        #endregion
-
-        #region Private methods
 
         private void ResetTimer()
         {
@@ -453,11 +487,23 @@ namespace StreamTimer
             int width = img.Width;
             int startHeight = height - (int)(height * remainingPercentage);
 
-            var color = GetHourglassColor(ColorTranslator.FromHtml(settings.HourglassColor), remainingPercentage);
-
             // Background
-            var bgBrush = new SolidBrush(color);
-            graphics.FillRectangle(bgBrush, 0, startHeight, width, height);
+
+            if (settings.HourglassImageMode && pauseImage != null)
+            {
+                // Draw image
+                graphics.DrawImage(pauseImage, new Rectangle(0, 0, width, height));
+
+                // Cover the top parts based on the time left
+                graphics.FillRectangle(new SolidBrush(Color.Black), 0, 0, width, startHeight);
+            }
+           else
+            {
+                var color = GetHourglassColor(ColorTranslator.FromHtml(settings.HourglassColor), remainingPercentage);
+                var bgBrush = new SolidBrush(color);
+                graphics.FillRectangle(bgBrush, 0, startHeight, width, height);
+            }
+            
             await Connection.SetTitleAsync((string)null);
             await Connection.SetImageAsync(img);
             graphics.Dispose();
@@ -476,7 +522,28 @@ namespace StreamTimer
                 SetTimerInterval();
                 SetStreamahtonIncrement();
                 PropagatePlaybackDevices();
+                PrefetchImages();
             });
+        }
+
+        private void PrefetchImages()
+        {
+            if (pauseImage != null)
+            {
+                pauseImage.Dispose();
+                pauseImage = null;
+            }
+
+            if (!String.IsNullOrEmpty(settings.PauseImageFile))
+            {
+                if (!File.Exists(settings.PauseImageFile))
+                {
+                    Logger.Instance.LogMessage(TracingLevel.ERROR, $"PauseImageFile does not exist {settings.PauseImageFile}");
+                    return;
+                }
+
+                pauseImage = Image.FromFile(settings.PauseImageFile);
+            }
         }
 
         private void PropagatePlaybackDevices()
@@ -503,16 +570,17 @@ namespace StreamTimer
             }
         }
 
-        private Task PlaySoundOnEnd()
+        private void PlaySoundOnEnd()
         {
-            return Task.Run(() =>
+            Task.Run(() =>
             {
-                // Q98NF-KR5LZ-DWBAB
-                if (!settings.PlaySoundOnEnd)
+        // Q98NF-KR5LZ-DWBAB
+        if (!settings.PlaySoundOnEnd)
                 {
                     return;
                 }
 
+                stopPlayback = false;
                 if (String.IsNullOrEmpty(settings.PlaySoundOnEndFile) || string.IsNullOrEmpty(settings.PlaybackDevice))
                 {
                     Logger.Instance.LogMessage(TracingLevel.WARN, $"PlaySoundOnEnd called but File or Playback device are empty. File: {settings.PlaySoundOnEndFile} Device: {settings.PlaybackDevice}");
@@ -526,20 +594,27 @@ namespace StreamTimer
                 }
 
                 Logger.Instance.LogMessage(TracingLevel.INFO, $"PlaySoundOnEnd called. Playing {settings.PlaySoundOnEndFile} on device: {settings.PlaybackDevice}");
-                var deviceNumber = GetPlaybackDeviceFromDeviceName(settings.PlaybackDevice); using (var audioFile = new AudioFileReader(settings.PlaySoundOnEndFile))
+                var deviceNumber = GetPlaybackDeviceFromDeviceName(settings.PlaybackDevice); 
+                using (var audioFile = new AudioFileReader(settings.PlaySoundOnEndFile))
                 {
                     using (var outputDevice = new WaveOutEvent())
                     {
                         outputDevice.DeviceNumber = deviceNumber;
                         outputDevice.Init(audioFile);
                         outputDevice.Play();
-                        while (outputDevice.PlaybackState == PlaybackState.Playing)
+                        while (!stopPlayback && outputDevice.PlaybackState == PlaybackState.Playing)
                         {
                             System.Threading.Thread.Sleep(1000);
                         }
+                        outputDevice.Stop();
                     }
                 }
             });
+        }
+
+        private void StopPlayback()
+        {
+            stopPlayback = true;
         }
 
         private int GetPlaybackDeviceFromDeviceName(string deviceName)

@@ -26,6 +26,14 @@
             <div class="sdpi-item-label">Alert Color</div>
             <input type="color" class="sdpi-item-value sdProperty" value="#FF0000" id="alertColor" oninput="setSettings()">
         </div>
+        <div class="sdpi-item" id="dvKeyImage">
+            <div class="sdpi-item-label">Pause Image</div>
+            <div class="sdpi-item-group file" id="filepickergroup">
+                <input class="sdpi-item-value sdProperty sdFile" type="file" id="pauseImageFile" accept=".jpg, .jpeg, .png, .ico, .gif, .bmp, .tiff" oninput="setSettings()">
+                <label class="sdpi-file-info " for="pauseImageFile" id="pauseImageFileFilename">No file...</label>
+                <label class="sdpi-file-label" for="pauseImageFile">Choose file...</label>
+            </div>
+        </div>
         <div class="sdpi-item" id="dvTimerFileName">
             <div class="sdpi-item-label">File Name</div>
             <input class="sdpi-item-value sdProperty hasFileButton" disabled value="" id="timerFileName">
@@ -81,13 +89,29 @@
                 <label for="hourglassMode" class="sdpi-item-label"><span></span>Graphical timer representation</label>
             </div>
         </div>
-        <div type="color" class="sdpi-item" id="dvHourglassColor">
-            <div class="sdpi-item-label">Hourglass Color</div>
-            <input type="color" class="sdpi-item-value sdProperty" value="#000000" id="hourglassColor" oninput="setSettings()">
+        <div id="dvHourglassSettings">
+            <div type="checkbox" class="sdpi-item" id="dvHourglassShowTime">
+                <div class="sdpi-item-label">Show Time</div>
+                <div class="sdpi-item-value">
+                    <input id="hourglassTime" type="checkbox" value="" class="sdProperty sdCheckbox" oninput="setSettings()">
+                    <label for="hourglassTime" class="sdpi-item-label"><span></span>Show time in Hourglass mode</label>
+                </div>
+            </div>
+            <div type="checkbox" class="sdpi-item" id="dvHourglassImageMode">
+                <div class="sdpi-item-label">Image Mode</div>
+                <div class="sdpi-item-value">
+                    <input id="hourglassImageMode" type="checkbox" value="" class="sdProperty sdCheckbox" oninput="setSettings()">
+                    <label for="hourglassImageMode" class="sdpi-item-label"><span></span>Use Pause Image as effect</label>
+                </div>
+            </div>
+            <div type="color" class="sdpi-item" id="dvHourglassColor">
+                <div class="sdpi-item-label">Hourglass Color</div>
+                <input type="color" class="sdpi-item-value sdProperty" value="#000000" id="hourglassColor" oninput="setSettings()">
+            </div>
+            <details class="message" id="dvHourglassMessage">
+                <summary>Use black for auto-color (Green->Yellow->Red)</summary>
+            </details>
         </div>
-        <details class="message" id="dvHourglassMessage">
-            <summary>Use black for auto-color (Green->Yellow->Red)</summary>
-        </details>
         <div type="checkbox" class="sdpi-item" id="dvStreamathonMode">
             <div class="sdpi-item-label">Streamathon mode</div>
             <div class="sdpi-item-value">

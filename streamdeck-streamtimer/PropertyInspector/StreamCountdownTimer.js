@@ -38,10 +38,8 @@ function showHideSettings(payload) {
 }
 
 function setHourglass(displayValue) {
-    var dvHourglassColor = document.getElementById('dvHourglassColor');
-    var dvHourglassMessage = document.getElementById('dvHourglassMessage');
-    dvHourglassColor.style.display = displayValue;
-    dvHourglassMessage.style.display = displayValue;
+    var dvHourglassSettings = document.getElementById('dvHourglassSettings');
+    dvHourglassSettings.style.display = displayValue;
 }
 
 function setStreamathon(displayValue) {
@@ -56,3 +54,12 @@ function setSoundOnEndSettings(displayValue) {
     dvSoundOnEndSettings.style.display = displayValue;
 }
 
+function openSaveFilePicker(title, filter, propertyName) {
+    console.log("openSaveFilePicker called: ", title, filter, propertyName);
+    var payload = {};
+    payload.property_inspector = 'loadsavepicker';
+    payload.picker_title = title;
+    payload.picker_filter = filter;
+    payload.property_name = propertyName;
+    sendPayloadToPlugin(payload);
+}

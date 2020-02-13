@@ -4,6 +4,12 @@ Set a timer on your Stream Deck, and have it shown on your Stream too. Will star
 
 **Author's website and contact information:** [https://barraider.com](https://barraider.com)
 
+## New in v1.5
+- `Pause Image` - Displays a custom image when timer is paused (supported both in Normal and Hourglass mode)
+- New option to show time remaining in Hourglass mode
+- When pressing the button to stop the flashing, it now stops the sound too
+- New visual effect for Hourglass mode: `Image Mode` will show the `Pause Image` slowly vanish as the time runs out
+
 ## New in v1.4
 - Multi-Action support
 
