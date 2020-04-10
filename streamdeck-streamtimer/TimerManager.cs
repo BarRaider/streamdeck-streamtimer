@@ -265,6 +265,7 @@ namespace StreamTimer
         {
             if (global == null)
             {
+                Logger.Instance.LogMessage(TracingLevel.WARN, $"SaveTimers - global is null, creating new object");
                 global = new GlobalSettings();
             }
             global.DicTimers = dicTimers;

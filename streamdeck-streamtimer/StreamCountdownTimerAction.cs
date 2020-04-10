@@ -150,7 +150,7 @@ namespace StreamTimer
             {
                 this.settings = payload.Settings.ToObject<PluginSettings>();
             }
-            Connection.StreamDeckConnection.OnSendToPlugin += StreamDeckConnection_OnSendToPlugin;
+            Connection.OnSendToPlugin += Connection_OnSendToPlugin;
             timerId = Connection.ContextId;
             tmrAlert.Interval = 200;
             tmrAlert.Elapsed += TmrAlert_Elapsed;
@@ -159,7 +159,7 @@ namespace StreamTimer
 
         public override void Dispose()
         {
-            Connection.StreamDeckConnection.OnSendToPlugin -= StreamDeckConnection_OnSendToPlugin;
+            Connection.OnSendToPlugin -= Connection_OnSendToPlugin;
             tmrAlert.Elapsed -= TmrAlert_Elapsed;
             tmrAlert.Stop();
             Logger.Instance.LogMessage(TracingLevel.INFO, "Destructor called");
@@ -630,13 +630,9 @@ namespace StreamTimer
             return -1;
         }
 
-        private void StreamDeckConnection_OnSendToPlugin(object sender, streamdeck_client_csharp.StreamDeckEventReceivedEventArgs<streamdeck_client_csharp.Events.SendToPluginEvent> e)
+        private void Connection_OnSendToPlugin(object sender, BarRaider.SdTools.Wrappers.SDEventReceivedEventArgs<BarRaider.SdTools.Events.SendToPlugin> e)
         {
             var payload = e.Event.Payload;
-            if (Connection.ContextId != e.Event.Context)
-            {
-                return;
-            }
 
             Logger.Instance.LogMessage(TracingLevel.INFO, "OnSendToPlugin called");
             if (payload["property_inspector"] != null)
