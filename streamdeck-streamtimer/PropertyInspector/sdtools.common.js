@@ -1,4 +1,14 @@
-﻿// sdtools.common.js v1.0
+﻿// ****************************************************************
+// * EasyPI v1.3
+// * Author: BarRaider
+// *
+// * JS library to simplify the communication between the 
+// * Stream Deck's Property Inspector and the plugin.
+// *
+// * Project page: https://github.com/BarRaider/streamdeck-easypi
+// * Support: http://discord.barraider.com
+// ****************************************************************
+
 var websocket = null,
     uuid = null,
     registerEventName = null,
@@ -87,6 +97,9 @@ function loadConfiguration(payload) {
                 }
                 elem.value = payload[valueField];
             }
+            else if (elem.classList.contains("sdHTML")) { // HTML element
+                elem.innerHTML = payload[key];
+            }
             else { // Normal value
                 elem.value = payload[key];
             }
@@ -123,22 +136,16 @@ function setSettings() {
             var valueField = elem.getAttribute("sdValueField");
             payload[valueField] = elem.value;
         }
+        else if (elem.classList.contains("sdHTML")) { // HTML element
+            var valueField = elem.getAttribute("sdValueField");
+            payload[valueField] = elem.innerHTML;
+        }
         else { // Normal value
             payload[key] = elem.value;
         }
         console.log("Save: " + key + "<=" + payload[key]);
     });
     setSettingsToPlugin(payload);
-}
-
-function openSaveFilePicker(title, filter, propertyName) {
-    console.log("openSaveFilePicker called: ", title, filter, propertyName);
-    var payload = {};
-    payload.property_inspector = 'loadsavepicker';
-    payload.picker_title = title;
-    payload.picker_filter = filter;
-    payload.property_name = propertyName;
-    sendPayloadToPlugin(payload);
 }
 
 function setSettingsToPlugin(payload) {
