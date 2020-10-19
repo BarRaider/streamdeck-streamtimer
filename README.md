@@ -4,6 +4,12 @@ Set a timer on your Stream Deck, and have it shown on your Stream too. Will star
 
 **Author's website and contact information:** [https://barraider.com](https://barraider.com)
 
+## New in v1.6
+- :new: `Focus Timer` action alternates between work and break intervals to improve your focus and get work done. 
+- `Auto Reset` feature allows you to reset the timer automatically after a customizable number of seconds
+- Timer will now count up after reaching zero, to show you how much time elapsed.
+- `Streamathon` mode now supports increasing OR decreasing time on every keypress
+
 ## New in v1.5
 - `Pause Image` - Displays a custom image when timer is paused (supported both in Normal and Hourglass mode)
 - New option to show time remaining in Hourglass mode

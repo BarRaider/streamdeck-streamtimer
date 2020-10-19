@@ -5,11 +5,11 @@
     <meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no,minimal-ui,viewport-fit=cover">
     <meta name=apple-mobile-web-app-capable content=yes>
     <meta name=apple-mobile-web-app-status-bar-style content=black>
-    <title>BarRaider's Stream Countdown Timer</title>
+    <title>BarRaider's Potato Timer</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/barraider/streamdeck-easypi@latest/src/sdpi.css">
     <script src="https://cdn.jsdelivr.net/gh/barraider/streamdeck-easypi@latest/src/sdtools.common.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/barraider/streamdeck-easypi@latest/src/pickers.js"></script>
-    <script src="StreamCountdownTimer.js"></script>
+    <script src="Focus.js"></script>
 </head>
 <body>
     <div class="sdpi-wrapper">
@@ -17,9 +17,22 @@
             <summary>For feedback/suggestions contact me at <span class="linkspan" onclick="openWebsite()">https://BarRaider.com</span> </summary>
         </details>
         <div class="sdpi-item" id="dvCounterTime">
-            <div class="sdpi-item-label">Time</div>
-            <input class="sdpi-item-value sdProperty" placeholder="00:05:00" value="" id="timerInterval" oninput="setSettings()">
+            <div class="sdpi-item-label">Work Time</div>
+            <input class="sdpi-item-value sdProperty" placeholder="00:25:00" value="" id="workInterval" oninput="setSettings()">
         </div>
+        <div class="sdpi-item" id="dvbreakTime">
+            <div class="sdpi-item-label">Break Time</div>
+            <input class="sdpi-item-value sdProperty" placeholder="00:05:00" value="" id="breakInterval" oninput="setSettings()">
+        </div>
+        <div class="sdpi-item" id="dvRepeat">
+            <div class="sdpi-item-label">Number of Repeats</div>
+            <input class="sdpi-item-value sdProperty" id="repeatAmount" inputmode="numeric" pattern="[0-9]*" type="number" oninput="setSettings()">
+        </div>
+        <div class="sdpi-item" id="dvLongBreakTime">
+            <div class="sdpi-item-label">Long Break Time</div>
+            <input class="sdpi-item-value sdProperty" placeholder="00:15:00" value="" id="longBreakInterval" oninput="setSettings()">
+        </div>
+        <hr />
         <details class="message">
             <summary>Long press the key to reset the timer</summary>
         </details>
@@ -27,16 +40,20 @@
             <div class="sdpi-item-label">Alert Color</div>
             <input type="color" class="sdpi-item-value sdProperty" value="#FF0000" id="alertColor" oninput="setSettings()">
         </div>
-        <div class="sdpi-item" id="anumber">
-            <div class="sdpi-item-label">Auto reset after (seconds)</div>
-            <input class="sdpi-item-value sdProperty" id="autoResetSeconds" inputmode="numeric" pattern="[0-9]*" type="number" oninput="setSettings()">
+        <div class="sdpi-item" id="dvKeyImage">
+            <div class="sdpi-item-label">Work Image</div>
+            <div class="sdpi-item-group file" id="filepickergroup">
+                <input class="sdpi-item-value sdProperty sdFile" type="file" id="workImageFile" accept=".jpg, .jpeg, .png, .ico, .gif, .bmp, .tiff" oninput="setSettings()">
+                <label class="sdpi-file-info " for="workImageFile" id="workImageFileFilename">No file...</label>
+                <label class="sdpi-file-label" for="workImageFile">Choose file...</label>
+            </div>
         </div>
         <div class="sdpi-item" id="dvKeyImage">
-            <div class="sdpi-item-label">Pause Image</div>
+            <div class="sdpi-item-label">Break Image</div>
             <div class="sdpi-item-group file" id="filepickergroup">
-                <input class="sdpi-item-value sdProperty sdFile" type="file" id="pauseImageFile" accept=".jpg, .jpeg, .png, .ico, .gif, .bmp, .tiff" oninput="setSettings()">
-                <label class="sdpi-file-info " for="pauseImageFile" id="pauseImageFileFilename">No file...</label>
-                <label class="sdpi-file-label" for="pauseImageFile">Choose file...</label>
+                <input class="sdpi-item-value sdProperty sdFile" type="file" id="breakImageFile" accept=".jpg, .jpeg, .png, .ico, .gif, .bmp, .tiff" oninput="setSettings()">
+                <label class="sdpi-file-info " for="breakImageFile" id="breakImageFileFilename">No file...</label>
+                <label class="sdpi-file-label" for="breakImageFile">Choose file...</label>
             </div>
         </div>
         <div class="sdpi-item" id="dvTimerFileName">
@@ -72,6 +89,7 @@
                     <label class="sdpi-file-label" for="playSoundOnEndFile">Choose file...</label>
                 </div>
             </div>
+            <hr />
         </div>
         <div type="checkbox" class="sdpi-item" id="dvClearFileOnReset">
             <div class="sdpi-item-label">Clear on Reset</div>
@@ -87,50 +105,13 @@
                 <label for="resumeOnClick" class="sdpi-item-label"><span></span>Unpausing does not reset</label>
             </div>
         </div>
-        <div type="checkbox" class="sdpi-item" id="dvHourglassMode">
-            <div class="sdpi-item-label">Hourglass mode</div>
+        <div type="checkbox" class="sdpi-item" id="dvHourglassShowTime">
+            <div class="sdpi-item-label">Show Time</div>
             <div class="sdpi-item-value">
-                <input id="hourglassMode" type="checkbox" value="" class="sdProperty sdCheckbox" oninput="setSettings()">
-                <label for="hourglassMode" class="sdpi-item-label"><span></span>Graphical timer representation</label>
+                <input id="hourglassTime" type="checkbox" value="" class="sdProperty sdCheckbox" oninput="setSettings()">
+                <label for="hourglassTime" class="sdpi-item-label"><span></span>Show time left</label>
             </div>
         </div>
-        <div id="dvHourglassSettings">
-            <div type="checkbox" class="sdpi-item" id="dvHourglassShowTime">
-                <div class="sdpi-item-label">Show Time</div>
-                <div class="sdpi-item-value">
-                    <input id="hourglassTime" type="checkbox" value="" class="sdProperty sdCheckbox" oninput="setSettings()">
-                    <label for="hourglassTime" class="sdpi-item-label"><span></span>Show time in Hourglass mode</label>
-                </div>
-            </div>
-            <div type="checkbox" class="sdpi-item" id="dvHourglassImageMode">
-                <div class="sdpi-item-label">Image Mode</div>
-                <div class="sdpi-item-value">
-                    <input id="hourglassImageMode" type="checkbox" value="" class="sdProperty sdCheckbox" oninput="setSettings()">
-                    <label for="hourglassImageMode" class="sdpi-item-label"><span></span>Use Pause Image as effect</label>
-                </div>
-            </div>
-            <div type="color" class="sdpi-item" id="dvHourglassColor">
-                <div class="sdpi-item-label">Hourglass Color</div>
-                <input type="color" class="sdpi-item-value sdProperty" value="#000000" id="hourglassColor" oninput="setSettings()">
-            </div>
-            <details class="message" id="dvHourglassMessage">
-                <summary>Use black for auto-color (Green->Yellow->Red)</summary>
-            </details>
-        </div>
-        <div type="checkbox" class="sdpi-item" id="dvStreamathonMode">
-            <div class="sdpi-item-label">Streamathon mode</div>
-            <div class="sdpi-item-value">
-                <input id="streamathonMode" type="checkbox" value="" class="sdProperty sdCheckbox" oninput="setSettings()">
-                <label for="streamathonMode" class="sdpi-item-label"><span></span>Supports increasing/decreasing time on every key press</label>
-            </div>
-        </div>
-        <div class="sdpi-item" id="dvStreamathonIncrement">
-            <div class="sdpi-item-label">Streamathon Increment/Decrement</div>
-            <input class="sdpi-item-value sdProperty" placeholder="-00:05:00" value="" id="streamathonIncrement" oninput="setSettings()">
-        </div>
-        <details class="message" id="dvStreamathonMessage">
-            <summary>In Streamathon mode, each press increases/decreases the time by set increment. Long press resets.</summary>
-        </details>
         <div type="checkbox" class="sdpi-item" id="MultilineStopwatch">
             <div class="sdpi-item-label">Multiline</div>
             <div class="sdpi-item-value">

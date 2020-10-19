@@ -2,9 +2,11 @@
 using NAudio.Wave;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using StreamTimer.Backend;
 using StreamTimer.Wrappers;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.Design;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -12,7 +14,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Timers;
 
-namespace StreamTimer
+namespace StreamTimer.Actions
 {
     [PluginActionId("com.barraider.streamcountdowntimer")]
 
@@ -40,7 +42,7 @@ namespace StreamTimer
                     TimerFileName = String.Empty,
                     FilePrefix = String.Empty,
                     CountdownEndText = String.Empty,
-                    TimerInterval = "00:01:00",
+                    TimerInterval = DEFAULT_TIMER_INTERVAL,
                     AlertColor = "#FF0000",
                     HourglassColor = "#000000",
                     StreamathonIncrement = String.Empty,
@@ -49,7 +51,8 @@ namespace StreamTimer
                     PlaySoundOnEndFile = String.Empty,
                     PauseImageFile = String.Empty,
                     HourglassTime = false,
-                    HourglassImageMode = false
+                    HourglassImageMode = false,
+                    AutoResetSeconds = DEFAULT_AUTO_RESET_SECONDS.ToString(),
                 };
 
                 return instance;
@@ -114,12 +117,17 @@ namespace StreamTimer
 
             [JsonProperty(PropertyName = "hourglassImageMode")]
             public bool HourglassImageMode { get; set; }
+
+            [JsonProperty(PropertyName = "autoResetSeconds")]
+            public string AutoResetSeconds { get; set; }            
         }
 
         #region Private members
 
-        private const int RESET_COUNTER_KEYPRESS_LENGTH = 1;
+        private const int RESET_COUNTER_KEYPRESS_LENGTH_MS = 600;
         private const int TOTAL_ALERT_STAGES = 4;
+        private const int DEFAULT_AUTO_RESET_SECONDS = 0;
+        private const string DEFAULT_TIMER_INTERVAL = "00:01:00";
 
         private readonly Timer tmrAlert = new Timer();
         private bool isAlerting = false;
@@ -130,10 +138,12 @@ namespace StreamTimer
         private DateTime keyPressStart;
         private readonly string timerId;
         private TimeSpan timerInterval;
-        private TimeSpan streamathonIncrement;
+        private TimeSpan streamathonIncrement = TimeSpan.Zero;
+        private long highestTimerSeconds;
         private bool displayCurrentStatus = false;
         private Image pauseImage = null;
         private bool stopPlayback = false;
+        private int autoResetSeconds = DEFAULT_AUTO_RESET_SECONDS;
 
         #endregion
 
@@ -201,28 +211,16 @@ namespace StreamTimer
 
             if (isAlerting)
             {
-                isAlerting = false;
-                tmrAlert.Stop();
-                StopPlayback();
-                ResetTimer();
-                await Connection.SetImageAsync((string)null);
+                await ResetAlert();
                 return;
             }
 
             if (settings.StreamathonMode && TimerManager.Instance.IsTimerEnabled(timerId))
             {
                 // Increment the timer
-                if (streamathonIncrement.TotalSeconds > 0)
+                if (!TimerManager.Instance.IncrementTimer(timerId, streamathonIncrement))
                 {
-                    if (!TimerManager.Instance.IncrementTimer(timerId, streamathonIncrement))
-                    {
-                        Logger.Instance.LogMessage(TracingLevel.WARN, $"TimerManager IncrementTimer failed");
-                        await Connection.ShowAlert();
-                    }
-                }
-                else
-                {
-                    Logger.Instance.LogMessage(TracingLevel.WARN, $"Streamathon mode - Invalid Increment {settings.StreamathonIncrement}");
+                    Logger.Instance.LogMessage(TracingLevel.WARN, $"TimerManager IncrementTimer failed");
                     await Connection.ShowAlert();
                 }
             }
@@ -260,6 +258,17 @@ namespace StreamTimer
 
             if (isAlerting)
             {
+                var endTime = TimerManager.Instance.GetTimerEndTime(timerId);
+                if (endTime > DateTime.MinValue)
+                {
+                    long timeElapsed = (long)(DateTime.Now - endTime).TotalSeconds;
+                    await ShowTimeOnKey(timeElapsed);
+
+                    if (autoResetSeconds > 0 && timeElapsed > autoResetSeconds)
+                    {
+                        await ResetAlert();
+                    }
+                }                
                 return;
             }
 
@@ -276,6 +285,10 @@ namespace StreamTimer
                 tmrAlert.Start();
                 TimerManager.Instance.StopTimer(timerId);
                 PlaySoundOnEnd();
+            }
+            else if (total > highestTimerSeconds) // Streamathon Mode, when INCREASING the time left. Needed to correctly show the hourglass
+            {
+                highestTimerSeconds = total;
             }
 
             if (!TimerManager.Instance.IsTimerEnabled(timerId) && pauseImage != null)
@@ -319,13 +332,13 @@ namespace StreamTimer
             hours = minutes / 60;
             minutes %= 60;
 
-            string hoursStr = (hours > 0) ? $"{hours.ToString("0")}{delimiter}" : "";
+            string hoursStr = (hours > 0) ? $"{hours:0}{delimiter}" : "";
             string secondsDelimiter = delimiter;
             if (!String.IsNullOrEmpty(hoursStr))
             {
                 secondsDelimiter = "\n";
             }
-            await Connection.SetTitleAsync($"{hoursStr}{minutes.ToString("00")}{secondsDelimiter}{seconds.ToString("00")}");
+            await Connection.SetTitleAsync($"{hoursStr}{minutes:00}{secondsDelimiter}{seconds:00}");
         }
 
         private void ResetTimer()
@@ -340,6 +353,7 @@ namespace StreamTimer
                 FileCountdownEndText = settings.CountdownEndText,
                 ClearFileOnReset = settings.ClearFileOnReset
             });
+            highestTimerSeconds = (long)timerInterval.TotalSeconds;
         }
 
         private void ResumeTimer()
@@ -363,7 +377,7 @@ namespace StreamTimer
                 return;
             }
 
-            if ((DateTime.Now - keyPressStart).TotalSeconds > RESET_COUNTER_KEYPRESS_LENGTH)
+            if ((DateTime.Now - keyPressStart).TotalMilliseconds >= RESET_COUNTER_KEYPRESS_LENGTH_MS)
             {
                 PauseTimer();
                 ResetTimer();
@@ -380,9 +394,20 @@ namespace StreamTimer
             streamathonIncrement = TimeSpan.Zero;
             if (settings.StreamathonMode && !String.IsNullOrEmpty(settings.StreamathonIncrement))
             {
-                if (!TimeSpan.TryParse(settings.StreamathonIncrement, out streamathonIncrement))
+                string increment = settings.StreamathonIncrement;
+                bool isNegative = false;
+                if (increment[0] == '-')
+                {
+                    increment = increment.Substring(1);
+                    isNegative = true;
+                }
+                if (!TimeSpan.TryParse(increment, out streamathonIncrement))
                 {
                     Logger.Instance.LogMessage(TracingLevel.WARN, $"Invalid Streamathon Increment: {settings.StreamathonIncrement}");
+                }
+                else if (isNegative)
+                {
+                    streamathonIncrement = streamathonIncrement.Negate();
                 }
             }
         }
@@ -395,9 +420,12 @@ namespace StreamTimer
                 if (!TimeSpan.TryParse(settings.TimerInterval, out timerInterval))
                 {
                     Logger.Instance.LogMessage(TracingLevel.WARN, $"Invalid Timer Interval: {settings.TimerInterval}");
+                    settings.TimerInterval = DEFAULT_TIMER_INTERVAL;
+                    SaveSettings();
                 }
                 else
                 {
+                    highestTimerSeconds = (long)timerInterval.TotalSeconds;
                     if (!TimerManager.Instance.IsTimerEnabled(timerId))
                     {
                         ResetTimer();
@@ -473,11 +501,15 @@ namespace StreamTimer
 
         private async Task DisplayHourglass(long remainingSeconds)
         {
-            long totalSeconds = (long)timerInterval.TotalSeconds;
+            long totalSeconds = highestTimerSeconds;
 
             if (remainingSeconds <= 0)
             {
                 return;
+            }
+            else if (remainingSeconds > totalSeconds)
+            {
+                totalSeconds = remainingSeconds + 1;
             }
 
             double remainingPercentage = (double)remainingSeconds / (double)totalSeconds;
@@ -497,13 +529,13 @@ namespace StreamTimer
                 // Cover the top parts based on the time left
                 graphics.FillRectangle(new SolidBrush(Color.Black), 0, 0, width, startHeight);
             }
-           else
+            else
             {
                 var color = GetHourglassColor(ColorTranslator.FromHtml(settings.HourglassColor), remainingPercentage);
                 var bgBrush = new SolidBrush(color);
                 graphics.FillRectangle(bgBrush, 0, startHeight, width, height);
             }
-            
+
             await Connection.SetTitleAsync((string)null);
             await Connection.SetImageAsync(img);
             graphics.Dispose();
@@ -520,6 +552,15 @@ namespace StreamTimer
                     System.Threading.Thread.Sleep(1000);
                 }
                 SetTimerInterval();
+
+                if (!Int32.TryParse(settings.AutoResetSeconds, out autoResetSeconds))
+                {
+                    Logger.Instance.LogMessage(TracingLevel.WARN, $"Invalid AutoResetSeconds: {settings.AutoResetSeconds}");
+                    settings.AutoResetSeconds = DEFAULT_AUTO_RESET_SECONDS.ToString();
+                    autoResetSeconds = DEFAULT_AUTO_RESET_SECONDS;
+                    SaveSettings();
+                }
+
                 SetStreamahtonIncrement();
                 PropagatePlaybackDevices();
                 PrefetchImages();
@@ -574,8 +615,8 @@ namespace StreamTimer
         {
             Task.Run(() =>
             {
-        // Q98NF-KR5LZ-DWBAB
-        if (!settings.PlaySoundOnEnd)
+                // Q98NF-KR5LZ-DWBAB
+                if (!settings.PlaySoundOnEnd)
                 {
                     return;
                 }
@@ -594,21 +635,19 @@ namespace StreamTimer
                 }
 
                 Logger.Instance.LogMessage(TracingLevel.INFO, $"PlaySoundOnEnd called. Playing {settings.PlaySoundOnEndFile} on device: {settings.PlaybackDevice}");
-                var deviceNumber = GetPlaybackDeviceFromDeviceName(settings.PlaybackDevice); 
-                using (var audioFile = new AudioFileReader(settings.PlaySoundOnEndFile))
+                var deviceNumber = GetPlaybackDeviceFromDeviceName(settings.PlaybackDevice);
+                using var audioFile = new AudioFileReader(settings.PlaySoundOnEndFile);
+                using var outputDevice = new WaveOutEvent
                 {
-                    using (var outputDevice = new WaveOutEvent())
-                    {
-                        outputDevice.DeviceNumber = deviceNumber;
-                        outputDevice.Init(audioFile);
-                        outputDevice.Play();
-                        while (!stopPlayback && outputDevice.PlaybackState == PlaybackState.Playing)
-                        {
-                            System.Threading.Thread.Sleep(1000);
-                        }
-                        outputDevice.Stop();
-                    }
+                    DeviceNumber = deviceNumber
+                };
+                outputDevice.Init(audioFile);
+                outputDevice.Play();
+                while (!stopPlayback && outputDevice.PlaybackState == PlaybackState.Playing)
+                {
+                    System.Threading.Thread.Sleep(1000);
                 }
+                outputDevice.Stop();
             });
         }
 
@@ -637,7 +676,7 @@ namespace StreamTimer
             Logger.Instance.LogMessage(TracingLevel.INFO, "OnSendToPlugin called");
             if (payload["property_inspector"] != null)
             {
-                switch (payload["property_inspector"].ToString().ToLower())
+                switch (payload["property_inspector"].ToString().ToLowerInvariant())
                 {
                     case "loadsavepicker":
                         string propertyName = (string)payload["property_name"];
@@ -655,6 +694,15 @@ namespace StreamTimer
                         break;
                 }
             }
+        }
+
+        private async Task ResetAlert()
+        {
+            isAlerting = false;
+            tmrAlert.Stop();
+            StopPlayback();
+            ResetTimer();
+            await Connection.SetImageAsync((string)null);
         }
 
         #endregion

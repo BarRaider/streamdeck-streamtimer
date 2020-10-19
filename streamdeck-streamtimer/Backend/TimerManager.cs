@@ -1,5 +1,6 @@
 ﻿using BarRaider.SdTools;
 using Newtonsoft.Json.Linq;
+using StreamTimer.Wrappers;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -8,7 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Timers;
 
-namespace StreamTimer
+namespace StreamTimer.Backend
 {
     internal class TimerManager
     {
@@ -19,7 +20,6 @@ namespace StreamTimer
         private readonly Timer tmrTimerCounter;
         private Dictionary<string, TimerStatus> dicTimers = new Dictionary<string, TimerStatus>();
         private GlobalSettings global;
-
 
         #endregion
 
@@ -174,6 +174,15 @@ namespace StreamTimer
             return true;
         }
 
+        public DateTime GetTimerEndTime(string timerId)
+        {
+            if (!dicTimers.ContainsKey(timerId))
+            {
+                return DateTime.MinValue;
+            }
+            return dicTimers[timerId].EndTime;
+        }
+
         #endregion
 
         #region Private Methods
@@ -206,12 +215,6 @@ namespace StreamTimer
         {
             if (dicTimers[timerKey].IsEnabled)
             {
-                int secondsLeft = SecondsLeft(timerKey);
-                if (secondsLeft < 0)
-                {
-                    secondsLeft = 0;
-                }
-
                 WriteCounterToFile(timerKey);
             }
         }
@@ -247,8 +250,8 @@ namespace StreamTimer
             hours = minutes / 60;
             minutes %= 60;
 
-            string hoursStr = (hours > 0) ? $"{hours.ToString("0")}:" : "";
-            SaveTimerToFile(counterData.Filename, $"{counterData.FileTitlePrefix}{hoursStr}{minutes.ToString("00")}:{seconds.ToString("00")}");
+            string hoursStr = (hours > 0) ? $"{hours:0}:" : "";
+            SaveTimerToFile(counterData.Filename, $"{counterData.FileTitlePrefix}{hoursStr}{minutes:00}:{seconds:00}");
         }
 
         private int SecondsLeft(string counterKey)

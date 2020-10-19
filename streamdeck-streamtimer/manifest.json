@@ -14,16 +14,31 @@
       "Tooltip": "Set a timer on your Stream Deck, and have it shown on your Stream too",
       "UUID": "com.barraider.streamcountdowntimer",
       "PropertyInspectorPath": "PropertyInspector/StreamCountdownTimer.html"
+    },
+    {
+      "Icon": "Images/potatoIcon",
+      "Name": "Focus Timer",
+      "States": [
+        {
+          "Image": "Images/potatoAction",
+          "TitleAlignment": "middle",
+          "FontSize": "15"
+        }
+      ],
+      "SupportedInMultiActions": true,
+      "Tooltip": "Use work/break alternating timings to manage your time and get things done",
+      "UUID": "com.barraider.streamcountdowntimer.focustimer",
+      "PropertyInspectorPath": "PropertyInspector/Focus.html"
     }
   ],
   "Author": "BarRaider",
-  "Description": "Set a timer on your Stream Deck, and have it shown on your Stream too. Will start flashing in a color of your choice when the time is up.\nNew: Sound Support! Streamathon mode - increase the time left on every key press",
+  "Description": "Set a timer on your Stream Deck, and have it shown on your Stream too. Will start flashing in a color of your choice when the time is up.Includes sound support & Streamathon mode (increase/decrease the time left on every key press)\nNew: Focus Timer - Alternate between work & break cycles to mange your time and get things done.",
   "Name": "Stream Countdown Timer",
   "Icon": "Images/pluginIcon",
   "URL": "https://BarRaider.com/",
-  "Version": "1.5",
+  "Version": "1.6",
   "CodePath": "com.barraider.streamcountdowntimer",
-  "Category": "BarRaider",
+  "Category": "Timer [BarRaider]",
   "CategoryIcon": "Images/categoryIcon",
   "OS": [
     {
@@ -33,6 +48,6 @@
   ],
   "SDKVersion": 2,
   "Software": {
-    "MinimumVersion": "4.4.1"
+    "MinimumVersion": "4.9"
   }
 }

@@ -21,32 +21,10 @@
 
 function showHideSettings(payload) {
     console.log("Show Hide Settings Called");
-    setHourglass("none");
-    setStreamathon("none");
     setSoundOnEndSettings("none");
-    if (payload['hourglassMode']) {
-        setHourglass("");
-    }
-
-    if (payload['streamathonMode']) {
-        setStreamathon("");
-    }
-
     if (payload['playSoundOnEnd']) {
         setSoundOnEndSettings("");
     }
-}
-
-function setHourglass(displayValue) {
-    var dvHourglassSettings = document.getElementById('dvHourglassSettings');
-    dvHourglassSettings.style.display = displayValue;
-}
-
-function setStreamathon(displayValue) {
-    var dvStreamathonIncrement = document.getElementById('dvStreamathonIncrement');
-    var dvStreamathonMessage = document.getElementById('dvStreamathonMessage');
-    dvStreamathonIncrement.style.display = displayValue;
-    dvStreamathonMessage.style.display = displayValue;
 }
 
 function setSoundOnEndSettings(displayValue) {
