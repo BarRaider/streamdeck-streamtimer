@@ -1,5 +1,4 @@
 ﻿using BarRaider.SdTools;
-using NAudio.Wave;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using StreamTimer.Backend;
@@ -119,7 +118,7 @@ namespace StreamTimer.Actions
             public bool HourglassImageMode { get; set; }
 
             [JsonProperty(PropertyName = "autoResetSeconds")]
-            public string AutoResetSeconds { get; set; }            
+            public string AutoResetSeconds { get; set; }
         }
 
         #region Private members
@@ -160,6 +159,7 @@ namespace StreamTimer.Actions
             {
                 this.settings = payload.Settings.ToObject<PluginSettings>();
             }
+            Connection.OnPropertyInspectorDidAppear += Connection_OnPropertyInspectorDidAppear;
             Connection.OnSendToPlugin += Connection_OnSendToPlugin;
             timerId = Connection.ContextId;
             tmrAlert.Interval = 200;
@@ -169,6 +169,7 @@ namespace StreamTimer.Actions
 
         public override void Dispose()
         {
+            Connection.OnPropertyInspectorDidAppear -= Connection_OnPropertyInspectorDidAppear;
             Connection.OnSendToPlugin -= Connection_OnSendToPlugin;
             tmrAlert.Elapsed -= TmrAlert_Elapsed;
             tmrAlert.Stop();
@@ -179,6 +180,7 @@ namespace StreamTimer.Actions
         {
             bool clearOnReset = settings.ClearFileOnReset;
             string countdownEndText = settings.CountdownEndText;
+            bool playSound = settings.PlaySoundOnEnd;
             // New in StreamDeck-Tools v2.0:
             Tools.AutoPopulateSettings(settings, payload.Settings);
 
@@ -190,6 +192,12 @@ namespace StreamTimer.Actions
             {
                 settings.ClearFileOnReset = false;
             }
+
+            if (playSound != settings.PlaySoundOnEnd && settings.PlaySoundOnEnd)
+            {
+                PropagatePlaybackDevices();
+            }
+
             InitializeSettings();
             SaveSettings();
         }
@@ -268,7 +276,7 @@ namespace StreamTimer.Actions
                     {
                         await ResetAlert();
                     }
-                }                
+                }
                 return;
             }
 
@@ -562,7 +570,6 @@ namespace StreamTimer.Actions
                 }
 
                 SetStreamahtonIncrement();
-                PropagatePlaybackDevices();
                 PrefetchImages();
             });
         }
@@ -595,13 +602,7 @@ namespace StreamTimer.Actions
             {
                 if (settings.PlaySoundOnEnd)
                 {
-                    for (int idx = -1; idx < WaveOut.DeviceCount; idx++)
-                    {
-                        var currDevice = WaveOut.GetCapabilities(idx);
-                        settings.PlaybackDevices.Add(new PlaybackDevice() { ProductName = currDevice.ProductName });
-                    }
-
-                    settings.PlaybackDevices = settings.PlaybackDevices.OrderBy(p => p.ProductName).ToList();
+                    settings.PlaybackDevices = AudioUtils.Common.GetAllPlaybackDevices(true).Select(d => new PlaybackDevice() { ProductName = d }).OrderBy(p => p.ProductName).ToList();
                     SaveSettings();
                 }
             }
@@ -613,9 +614,8 @@ namespace StreamTimer.Actions
 
         private void PlaySoundOnEnd()
         {
-            Task.Run(() =>
+            Task.Run(async () =>
             {
-                // Q98NF-KR5LZ-DWBAB
                 if (!settings.PlaySoundOnEnd)
                 {
                     return;
@@ -635,38 +635,13 @@ namespace StreamTimer.Actions
                 }
 
                 Logger.Instance.LogMessage(TracingLevel.INFO, $"PlaySoundOnEnd called. Playing {settings.PlaySoundOnEndFile} on device: {settings.PlaybackDevice}");
-                var deviceNumber = GetPlaybackDeviceFromDeviceName(settings.PlaybackDevice);
-                using var audioFile = new AudioFileReader(settings.PlaySoundOnEndFile);
-                using var outputDevice = new WaveOutEvent
-                {
-                    DeviceNumber = deviceNumber
-                };
-                outputDevice.Init(audioFile);
-                outputDevice.Play();
-                while (!stopPlayback && outputDevice.PlaybackState == PlaybackState.Playing)
-                {
-                    System.Threading.Thread.Sleep(1000);
-                }
-                outputDevice.Stop();
+                await AudioUtils.Common.PlaySound(settings.PlaySoundOnEndFile, settings.PlaybackDevice);
             });
         }
 
         private void StopPlayback()
         {
             stopPlayback = true;
-        }
-
-        private int GetPlaybackDeviceFromDeviceName(string deviceName)
-        {
-            for (int idx = -1; idx < WaveOut.DeviceCount; idx++)
-            {
-                var currDevice = WaveOut.GetCapabilities(idx);
-                if (deviceName == currDevice.ProductName)
-                {
-                    return idx;
-                }
-            }
-            return -1;
         }
 
         private void Connection_OnSendToPlugin(object sender, BarRaider.SdTools.Wrappers.SDEventReceivedEventArgs<BarRaider.SdTools.Events.SendToPlugin> e)
@@ -694,6 +669,11 @@ namespace StreamTimer.Actions
                         break;
                 }
             }
+        }
+
+        private void Connection_OnPropertyInspectorDidAppear(object sender, BarRaider.SdTools.Wrappers.SDEventReceivedEventArgs<BarRaider.SdTools.Events.PropertyInspectorDidAppear> e)
+        {
+            PropagatePlaybackDevices();
         }
 
         private async Task ResetAlert()
