@@ -1,19 +1,19 @@
 {
   "Actions": [
     {
-      "Icon": "Images/icon",
-      "Name": "Stream Countdown Timer",
+      "Icon": "Images/countdownIcon",
+      "Name": "Date/Time Countdown",
       "States": [
         {
           "Image": "Images/pluginAction",
           "TitleAlignment": "middle",
-          "FontSize": "15"
+          "FontSize": "13"
         }
       ],
       "SupportedInMultiActions": true,
-      "Tooltip": "Set a timer on your Stream Deck, and have it shown on your Stream too",
-      "UUID": "com.barraider.streamcountdowntimer",
-      "PropertyInspectorPath": "PropertyInspector/StreamCountdownTimer.html"
+      "Tooltip": "Count down to a specific time or date/time",
+      "UUID": "com.barraider.datetimecountdown",
+      "PropertyInspectorPath": "PropertyInspector/DateTimeCountdown.html"
     },
     {
       "Icon": "Images/potatoIcon",
@@ -22,13 +22,28 @@
         {
           "Image": "Images/potatoAction",
           "TitleAlignment": "middle",
-          "FontSize": "15"
+          "FontSize": "13"
         }
       ],
       "SupportedInMultiActions": true,
       "Tooltip": "Use work/break alternating timings to manage your time and get things done",
       "UUID": "com.barraider.streamcountdowntimer.focustimer",
       "PropertyInspectorPath": "PropertyInspector/Focus.html"
+    },
+    {
+      "Icon": "Images/timerIcon",
+      "Name": "Stream Timer",
+      "States": [
+        {
+          "Image": "Images/pluginAction",
+          "TitleAlignment": "middle",
+          "FontSize": "13"
+        }
+      ],
+      "SupportedInMultiActions": true,
+      "Tooltip": "Set a timer on your Stream Deck, and have it shown on your Stream too",
+      "UUID": "com.barraider.streamcountdowntimer",
+      "PropertyInspectorPath": "PropertyInspector/StreamTimer.html"
     }
   ],
   "Author": "BarRaider",
@@ -36,7 +51,7 @@
   "Name": "Stream Countdown Timer",
   "Icon": "Images/pluginIcon",
   "URL": "https://BarRaider.com/",
-  "Version": "1.7",
+  "Version": "1.7.2",
   "CodePath": "com.barraider.streamcountdowntimer",
   "Category": "Timer [BarRaider]",
   "CategoryIcon": "Images/categoryIcon",

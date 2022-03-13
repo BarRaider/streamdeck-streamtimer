@@ -1,4 +1,5 @@
-﻿using System;
+﻿using StreamTimer.Backend;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -20,7 +21,9 @@ namespace StreamTimer.Wrappers
 
         public bool ClearFileOnReset { get; set; }
 
-        public int PausedTimeLeft { get; set; }
+        public long PausedTimeLeft { get; set; }
+
+        public string TimeFormat { get; set; }
 
         public TimerStatus()
         {
@@ -31,6 +34,7 @@ namespace StreamTimer.Wrappers
             FileCountdownEndText = null;
             ClearFileOnReset = false;
             PausedTimeLeft = 0;
+            TimeFormat = HelperUtils.DEFAULT_TIME_FORMAT;
         }
     }
 }

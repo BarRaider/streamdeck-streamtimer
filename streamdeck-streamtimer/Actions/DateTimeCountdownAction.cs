@@ -5,6 +5,8 @@ using StreamTimer.Backend;
 using StreamTimer.Wrappers;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.Design;
+using System.Diagnostics.PerformanceData;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -14,13 +16,16 @@ using System.Timers;
 
 namespace StreamTimer.Actions
 {
+    [PluginActionId("com.barraider.datetimecountdown")]
+
     //---------------------------------------------------
     //          BarRaider's Hall Of Fame
-    // Sm0ozle - Tip: $3.65
-    // Subscriber: Grumtastic
-    //---------------------------------------------------   
-    [PluginActionId("com.barraider.streamcountdowntimer.focustimer")]
-    public class FocusTimerAction : PluginBase
+    // Subscriber: TheLifeOfKB
+    // 300 Bits: Nachtmeister666
+    // Icessassin - Tip: $20.02
+    // onemousegaming - Tip: $3.50
+    //---------------------------------------------------
+    public class DateTimeCountdownAction : PluginBase
     {
         private class PluginSettings
         {
@@ -28,46 +33,32 @@ namespace StreamTimer.Actions
             {
                 PluginSettings instance = new PluginSettings
                 {
-                    ResumeOnClick = true,
                     Multiline = false,
-                    ClearFileOnReset = false,
+                    HourglassMode = false,
                     PlaySoundOnEnd = false,
                     TimerFileName = String.Empty,
                     FilePrefix = String.Empty,
                     CountdownEndText = String.Empty,
-                    WorkInterval = DEFAULT_WORK_INTERVAL,
-                    BreakInterval = DEFAULT_BREAK_INTERVAL,
-                    LongBreakInterval = DEFAULT_LONG_BREAK_INTERVAL,
-                    RepeatAmount = DEFAULT_REPEAT_AMOUNT.ToString(),
                     AlertColor = "#FF0000",
+                    HourglassColor = "#000000",
                     PlaybackDevice = String.Empty,
                     PlaybackDevices = null,
                     PlaySoundOnEndFile = String.Empty,
-                    HourglassTime = true,
-                    WorkImageFile = null,
-                    BreakImageFile = null
+                    HourglassTime = false,
+                    HourglassImageMode = false,
+                    AutoResetSeconds = DEFAULT_AUTO_RESET_SECONDS.ToString(),
+                    CountdownTimeOnly = false,
+                    CountdownTime = DEFAULT_COUNTDOWN_TIME_INTERVAL,
+                    CountdownDateTime = DEFAULT_COUNTDOWN_DATETIME_INTERVAL,
+                    TimeFormat = HelperUtils.DEFAULT_TIME_FORMAT,
+                    KeyPrefix = String.Empty
                 };
 
                 return instance;
             }
 
-            [JsonProperty(PropertyName = "resumeOnClick")]
-            public bool ResumeOnClick { get; set; }
-
             [JsonProperty(PropertyName = "multiline")]
             public bool Multiline { get; set; }
-
-            [JsonProperty(PropertyName = "workInterval")]
-            public string WorkInterval { get; set; }
-
-            [JsonProperty(PropertyName = "breakInterval")]
-            public string BreakInterval { get; set; }
-
-            [JsonProperty(PropertyName = "longBreakInterval")]
-            public string LongBreakInterval { get; set; }
-
-            [JsonProperty(PropertyName = "repeatAmount")]
-            public string RepeatAmount { get; set; }
 
             [FilenameProperty]
             [JsonProperty(PropertyName = "timerFileName")]
@@ -79,11 +70,14 @@ namespace StreamTimer.Actions
             [JsonProperty(PropertyName = "alertColor")]
             public string AlertColor { get; set; }
 
+            [JsonProperty(PropertyName = "hourglassMode")]
+            public bool HourglassMode { get; set; }
+
+            [JsonProperty(PropertyName = "hourglassColor")]
+            public string HourglassColor { get; set; }
+
             [JsonProperty(PropertyName = "countdownEndText")]
             public string CountdownEndText { get; set; }
-
-            [JsonProperty(PropertyName = "clearFileOnReset")]
-            public bool ClearFileOnReset { get; set; }
 
             [JsonProperty(PropertyName = "playSoundOnEnd")]
             public bool PlaySoundOnEnd { get; set; }
@@ -101,50 +95,56 @@ namespace StreamTimer.Actions
             [JsonProperty(PropertyName = "hourglassTime")]
             public bool HourglassTime { get; set; }
 
-            [FilenameProperty]
-            [JsonProperty(PropertyName = "workImageFile")]
-            public string WorkImageFile { get; set; }
+            [JsonProperty(PropertyName = "hourglassImageMode")]
+            public bool HourglassImageMode { get; set; }
 
-            [FilenameProperty]
-            [JsonProperty(PropertyName = "breakImageFile")]
-            public string BreakImageFile { get; set; }
+            [JsonProperty(PropertyName = "autoResetSeconds")]
+            public string AutoResetSeconds { get; set; }
+
+            [JsonProperty(PropertyName = "countdownTimeOnly")]
+            public bool CountdownTimeOnly { get; set; }
+
+            [JsonProperty(PropertyName = "countdownTime")]
+            public string CountdownTime { get; set; }
+
+            [JsonProperty(PropertyName = "countdownDateTime")]
+            public string CountdownDateTime { get; set; }
+
+            [JsonProperty(PropertyName = "timeFormat")]
+            public string TimeFormat { get; set; }
+
+            [JsonProperty(PropertyName = "keyPrefix")]
+            public string KeyPrefix { get; set; }
         }
 
         #region Private members
 
-        private const int RESET_COUNTER_KEYPRESS_LENGTH_MS = 600;
         private const int TOTAL_ALERT_STAGES = 4;
-        private const int DEFAULT_REPEAT_AMOUNT = 4;
-        private const string DEFAULT_WORK_INTERVAL = "00:25:00";
-        private const string DEFAULT_BREAK_INTERVAL = "00:05:00";
-        private const string DEFAULT_LONG_BREAK_INTERVAL = "00:15:00";
-        private const string DEFAULT_WORK_IMAGE = @"images\potato.png";
-        private const string DEFAULT_BREAK_IMAGE = @"images\break.png";
+        private const int DEFAULT_AUTO_RESET_SECONDS = 0;
+        private const string DEFAULT_COUNTDOWN_TIME_INTERVAL = "";
+        private const string DEFAULT_COUNTDOWN_DATETIME_INTERVAL = "";
+        private const string INPUT_ERROR_FILE = @"images\inputError.png";
 
         private readonly Timer tmrAlert = new Timer();
+        private DateTime endDateTime = DateTime.MinValue;
         private bool isAlerting = false;
         private int alertStage = 0;
 
         private readonly PluginSettings settings;
-        private bool keyPressed = false;
-        private DateTime keyPressStart;
         private readonly string timerId;
-        private TimeSpan workInterval;
-        private TimeSpan breakInterval;
-        private TimeSpan longBreakInterval;
-        private TimeSpan timerInterval;
-        private int repeatAmount = DEFAULT_REPEAT_AMOUNT;
+
+        private long highestTimerSeconds;
         private bool displayCurrentStatus = false;
-        private Image keyImage = null;
+        private Image pauseImage = null;
         private bool stopPlayback = false;
-        private FocusState currentMode = FocusState.WORK;
-        private int cycleNumber = 0;
+        private int autoResetSeconds = DEFAULT_AUTO_RESET_SECONDS;
+        private bool hadInputError = false;
 
         #endregion
 
         #region PluginBase Methods
 
-        public FocusTimerAction(SDConnection connection, InitialPayload payload) : base(connection, payload)
+        public DateTimeCountdownAction(SDConnection connection, InitialPayload payload) : base(connection, payload)
         {
             if (payload.Settings == null || payload.Settings.Count == 0)
             {
@@ -163,7 +163,6 @@ namespace StreamTimer.Actions
             InitializeSettings();
         }
 
-       
         public override void Dispose()
         {
             Connection.OnPropertyInspectorDidAppear -= Connection_OnPropertyInspectorDidAppear;
@@ -175,19 +174,15 @@ namespace StreamTimer.Actions
 
         public override void ReceivedSettings(ReceivedSettingsPayload payload)
         {
-            bool clearOnReset = settings.ClearFileOnReset;
-            string countdownEndText = settings.CountdownEndText;
+            hadInputError = false;
             bool playSound = settings.PlaySoundOnEnd;
+            string fileName = settings.TimerFileName;
             // New in StreamDeck-Tools v2.0:
             Tools.AutoPopulateSettings(settings, payload.Settings);
 
-            if (clearOnReset != settings.ClearFileOnReset)
+            if (fileName != settings.TimerFileName && !String.IsNullOrEmpty(settings.TimerFileName))
             {
-                settings.CountdownEndText = String.Empty;
-            }
-            else if (countdownEndText != settings.CountdownEndText)
-            {
-                settings.ClearFileOnReset = false;
+                HelperUtils.WriteToFile(settings.TimerFileName, String.Empty);
             }
 
             if (playSound != settings.PlaySoundOnEnd && settings.PlaySoundOnEnd)
@@ -203,227 +198,183 @@ namespace StreamTimer.Actions
 
         public async override void KeyPressed(KeyPayload payload)
         {
-            // Used for long press
-            keyPressStart = DateTime.Now;
-            keyPressed = true;
-            displayCurrentStatus = true;
-
+            if (settings.HourglassMode)
+            {
+                displayCurrentStatus = true;
+            }
             Logger.Instance.LogMessage(TracingLevel.INFO, "Key Pressed");
 
             if (isAlerting)
             {
-                isAlerting = false;
-                tmrAlert.Stop();
-                StopPlayback();
-                SetFocusMode();
-                PrefetchImages();
-                ResumeTimer();
-                await Connection.SetImageAsync((string)null);
+                await ResetAlert();
                 return;
-            }
-
-            if (TimerManager.Instance.IsTimerEnabled(timerId))
-            {
-                PauseTimer();
-            }
-            else
-            {
-                if (!settings.ResumeOnClick)
-                {
-                    ResetTimer();
-                }
-
-                ResumeTimer();
             }
         }
 
         public override void KeyReleased(KeyPayload payload)
         {
-            keyPressed = false;
             Logger.Instance.LogMessage(TracingLevel.INFO, "Key Released");
         }
 
         public async override void OnTick()
         {
-            long total;
-
             // Stream Deck calls this function every second, 
             // so this is the best place to determine if we need to reset (versus the internal timer which may be paused)
-            CheckIfResetNeeded();
 
             if (isAlerting)
             {
+                if (endDateTime > DateTime.MinValue)
+                {
+                    await ShowElapsedTimeOnKey();
+
+                    long timeElapsed = (long)(DateTime.Now - endDateTime).TotalSeconds;
+                    if (autoResetSeconds > 0 && timeElapsed > autoResetSeconds)
+                    {
+                        await ResetAlert();
+                    }
+                }
                 return;
             }
 
-            // Handle alerting
-            total = TimerManager.Instance.GetTimerTime(timerId);
-            if (total <= 0 && !TimerManager.Instance.IsTimerEnabled(timerId)) // Time passed before 
-            {
-                total = (int)timerInterval.TotalSeconds;
-            }
-            else if (total <= 0 && !tmrAlert.Enabled) // Timer running, need to alert
-            {
-                total = 0;
-                isAlerting = true;
-                tmrAlert.Start();
-                TimerManager.Instance.StopTimer(timerId);
-                PlaySoundOnEnd();
-            }
-
-            if (!TimerManager.Instance.IsTimerEnabled(timerId) && keyImage != null)
-            {
-                await Connection.SetImageAsync(keyImage);
-                await Connection.SetTitleAsync((string)null);
-                return;
-            }
-
-            // Handle hourglass mode
-            if (keyImage != null)
-            {
-                await DisplayHourglass(total);
-                if (displayCurrentStatus)
-                {
-                    displayCurrentStatus = false;
-                    await Connection.SetTitleAsync($"{(TimerManager.Instance.IsTimerEnabled(timerId) ? "▶️" : "||")}");
-                }
-                if (settings.HourglassTime)
-                {
-                    await ShowTimeOnKey(total);
-                }
-            }
-            else // Not Hourglass mode
-            {
-                await Connection.SetImageAsync((string)null);
-                await ShowTimeOnKey(total);
-            }
+            HandleTimeDisplay();
         }
 
         #endregion
 
         #region Private methods
 
-        private async Task ShowTimeOnKey(long total)
+        private async void HandleTimeDisplay()
         {
-            long minutes, seconds, hours;
-            string delimiter = settings.Multiline ? "\n" : ":";
-            minutes = total / 60;
-            seconds = total % 60;
-            hours = minutes / 60;
-            minutes %= 60;
-
-            string hoursStr = (hours > 0) ? $"{hours:0}{delimiter}" : "";
-            string secondsDelimiter = delimiter;
-            if (!String.IsNullOrEmpty(hoursStr))
-            {
-                secondsDelimiter = "\n";
-            }
-            await Connection.SetTitleAsync($"{hoursStr}{minutes:00}{secondsDelimiter}{seconds:00}");
-        }
-
-        private void ResetTimer()
-        {
-            TimerManager.Instance.ResetTimer(new TimerSettings()
-            {
-                TimerId = timerId,
-                CounterLength = timerInterval,
-                FileName = settings.TimerFileName,
-                FileTitlePrefix = settings.FilePrefix,
-                ResetOnStart = !settings.ResumeOnClick,
-                FileCountdownEndText = settings.CountdownEndText,
-                ClearFileOnReset = settings.ClearFileOnReset,
-                TimeFormat = HelperUtils.DEFAULT_TIME_FORMAT
-            });
-        }
-
-        private void ResumeTimer()
-        {
-            TimerManager.Instance.StartTimer(new TimerSettings()
-            {
-                TimerId = timerId,
-                CounterLength = timerInterval,
-                FileName = settings.TimerFileName,
-                FileTitlePrefix = settings.FilePrefix,
-                ResetOnStart = !settings.ResumeOnClick,
-                FileCountdownEndText = settings.CountdownEndText,
-                ClearFileOnReset = settings.ClearFileOnReset,
-                TimeFormat = HelperUtils.DEFAULT_TIME_FORMAT
-            });
-        }
-
-        private void CheckIfResetNeeded()
-        {
-            if (!keyPressed)
+            if (hadInputError)
             {
                 return;
             }
 
-            if ((DateTime.Now - keyPressStart).TotalMilliseconds >= RESET_COUNTER_KEYPRESS_LENGTH_MS)
+            if (endDateTime == DateTime.MinValue)
             {
-                PauseTimer();
-                currentMode = FocusState.WORK;
-                SetTimerInterval();
-                PrefetchImages();
-            }
-        }
-
-        private void PauseTimer()
-        {
-            TimerManager.Instance.StopTimer(timerId);
-        }
-
-        private void SetTimerInterval()
-        {
-            if (!Int32.TryParse(settings.RepeatAmount, out repeatAmount))
-            {
-                Logger.Instance.LogMessage(TracingLevel.WARN, $"Invalid Repeat Amount: {settings.BreakInterval}");
-                settings.RepeatAmount = DEFAULT_REPEAT_AMOUNT.ToString();
-                SaveSettings();
-            }
-
-            if (!TimeSpan.TryParse(settings.BreakInterval, out breakInterval))
-            {
-                Logger.Instance.LogMessage(TracingLevel.WARN, $"Invalid Break Interval: {settings.BreakInterval}");
-                settings.BreakInterval = DEFAULT_BREAK_INTERVAL;
-                SaveSettings();
-            }
-
-            if (!TimeSpan.TryParse(settings.LongBreakInterval, out longBreakInterval))
-            {
-                Logger.Instance.LogMessage(TracingLevel.WARN, $"Invalid Long Break Interval: {settings.LongBreakInterval}");
-                settings.LongBreakInterval = DEFAULT_LONG_BREAK_INTERVAL;
-                SaveSettings();
-            }
-
-            if (!TimeSpan.TryParse(settings.WorkInterval, out workInterval))
-            {
-                Logger.Instance.LogMessage(TracingLevel.WARN, $"Invalid Timer Interval: {settings.WorkInterval}");
-                settings.WorkInterval = DEFAULT_WORK_INTERVAL;
-                SaveSettings();
+                await Connection.SetTitleAsync((string)null);
+                await Connection.SetImageAsync((string)null);
                 return;
             }
 
-            switch (currentMode)
+            // Handle alerting
+            long total = (long)(endDateTime - DateTime.Now).TotalSeconds;
+            if (total <= 0 && !tmrAlert.Enabled) // Time passed, need to alert
             {
-                case FocusState.WORK:
-                    timerInterval = workInterval;
-                    break;
-                case FocusState.BREAK:
-                    timerInterval = breakInterval;
-                    break;
-                case FocusState.LONG_BREAK:
-                    timerInterval = longBreakInterval;
-                    break;
-                default:
-                    Logger.Instance.LogMessage(TracingLevel.ERROR, $"SetTimerInterval invalid mode {currentMode}");
-                    timerInterval = workInterval;
-                    break;
+                total = 0;
+                isAlerting = true;
+                tmrAlert.Start();
+                PlaySoundOnEnd();
             }
 
-            if (!TimerManager.Instance.IsTimerEnabled(timerId))
+            // Handle hourglass mode
+            if (settings.HourglassMode)
             {
-                ResetTimer();
+                await DisplayHourglass(total);
+                if (settings.HourglassTime)
+                {
+                    await ShowTimeOnKey();
+                }
             }
+            else // Not Hourglass mode
+            {
+                await Connection.SetImageAsync((string)null);
+                await ShowTimeOnKey();
+            }
+        }
+
+        private async Task ShowElapsedTimeOnKey()
+        {
+            string output = HelperUtils.FormatTime((long)(DateTime.Now - endDateTime).TotalSeconds, "h:mm:ss", settings.Multiline);
+            await Connection.SetTitleAsync(output);
+
+            string fileOutput = "00:00";
+            if (!String.IsNullOrEmpty(settings.CountdownEndText))
+            {
+                fileOutput = settings.CountdownEndText;
+            }
+            HelperUtils.WriteToFile(settings.TimerFileName, fileOutput);
+        }
+        private async Task ShowTimeOnKey()
+        {
+            string output = HelperUtils.FormatTime((long)(endDateTime - DateTime.Now).TotalSeconds, settings.TimeFormat, settings.Multiline);
+            if (output == null)
+            {
+                settings.TimeFormat = HelperUtils.DEFAULT_TIME_FORMAT;
+                await SaveSettings();
+            }
+            await Connection.SetTitleAsync($"{settings.KeyPrefix?.Replace(@"\n", "\n")}{output}");
+            HelperUtils.WriteToFile(settings.TimerFileName, $"{settings.FilePrefix}{output.Replace("\n",":")}");
+        }
+
+        private void SetRemainingInterval()
+        {
+            endDateTime = DateTime.MinValue;
+            if (settings.CountdownTimeOnly)
+            {
+                if (!TimeSpan.TryParse(settings.CountdownTime, out TimeSpan timespan))
+                {
+                    Logger.Instance.LogMessage(TracingLevel.WARN, $"Invalid Countdown Time: {settings.CountdownTime}");
+                    settings.CountdownTime = DEFAULT_COUNTDOWN_TIME_INTERVAL;
+                    SaveSettings();
+                    HandleInputError();
+                }
+                else
+                {
+                    DateTime dt = DateTime.Today.Add(timespan);
+                    if ((dt - DateTime.Now).TotalSeconds < 0)
+                    {
+                        dt = dt.AddDays(1);
+                    }
+                    endDateTime = dt;
+                    TriggerTimerIntervalChange();
+                }
+            }
+            else
+            {
+                if (!DateTime.TryParse(settings.CountdownDateTime, out DateTime dt))
+                {
+                    Logger.Instance.LogMessage(TracingLevel.WARN, $"Invalid Countdown DateTime: {settings.CountdownDateTime}");
+                    settings.CountdownDateTime = DEFAULT_COUNTDOWN_DATETIME_INTERVAL;
+                    SaveSettings();
+                    HandleInputError();
+                }
+                else
+                {
+                    if ((dt - DateTime.Now).TotalSeconds < 0) // Verify it hasn't passed
+                    {
+                        HandleInputError();
+                    }
+                    else
+                    {
+                        endDateTime = dt;
+                    }
+                    TriggerTimerIntervalChange();
+                }
+            }
+        }
+
+        private void HandleInputError()
+        {
+            hadInputError = true;
+            try
+            {
+                Connection.SetTitleAsync(null);
+                using (Image img = Image.FromFile(INPUT_ERROR_FILE))
+                {
+                    Connection.SetImageAsync(img);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Instance.LogMessage(TracingLevel.ERROR, $"{this.GetType()} HandleInputError Exception: {ex}");
+            }
+
+        }
+
+        private void TriggerTimerIntervalChange()
+        {
+            highestTimerSeconds = (long)(endDateTime - DateTime.Now).TotalSeconds;
         }
 
         private Task SaveSettings()
@@ -470,13 +421,38 @@ namespace StreamTimer.Actions
             graphics.Dispose();
         }
 
+        private Color GetHourglassColor(Color initialColor, double remainingPercentage)
+        {
+            if (initialColor.R != 0 || initialColor.G != 0 || initialColor.B != 0)
+            {
+                return initialColor;
+            }
+
+            if (remainingPercentage > 0.5)
+            {
+                return Color.Green;
+            }
+            else if (remainingPercentage > 0.20)
+            {
+                return Color.Yellow;
+            }
+            else
+            {
+                return Color.Red;
+            }
+        }
+
         private async Task DisplayHourglass(long remainingSeconds)
         {
-            long totalSeconds = (long)timerInterval.TotalSeconds;
+            long totalSeconds = highestTimerSeconds;
 
             if (remainingSeconds <= 0)
             {
                 return;
+            }
+            else if (remainingSeconds > totalSeconds)
+            {
+                totalSeconds = remainingSeconds + 1;
             }
 
             double remainingPercentage = (double)remainingSeconds / (double)totalSeconds;
@@ -487,17 +463,18 @@ namespace StreamTimer.Actions
             int startHeight = height - (int)(height * remainingPercentage);
 
             // Background
-            if (keyImage != null)
+
+            if (settings.HourglassImageMode && pauseImage != null)
             {
                 // Draw image
-                graphics.DrawImage(keyImage, new Rectangle(0, 0, width, height));
+                graphics.DrawImage(pauseImage, new Rectangle(0, 0, width, height));
 
                 // Cover the top parts based on the time left
                 graphics.FillRectangle(new SolidBrush(Color.Black), 0, 0, width, startHeight);
             }
             else
             {
-                var color = Color.Black;
+                var color = GetHourglassColor(ColorTranslator.FromHtml(settings.HourglassColor), remainingPercentage);
                 var bgBrush = new SolidBrush(color);
                 graphics.FillRectangle(bgBrush, 0, startHeight, width, height);
             }
@@ -511,57 +488,16 @@ namespace StreamTimer.Actions
         {
             Task.Run(() =>
             {
-                int retries = 60;
-                while (!TimerManager.Instance.IsInitialized && retries > 0)
+                SetRemainingInterval();
+
+                if (!Int32.TryParse(settings.AutoResetSeconds, out autoResetSeconds))
                 {
-                    retries--;
-                    System.Threading.Thread.Sleep(1000);
+                    Logger.Instance.LogMessage(TracingLevel.WARN, $"Invalid AutoResetSeconds: {settings.AutoResetSeconds}");
+                    settings.AutoResetSeconds = DEFAULT_AUTO_RESET_SECONDS.ToString();
+                    autoResetSeconds = DEFAULT_AUTO_RESET_SECONDS;
+                    SaveSettings();
                 }
-                SetTimerInterval();
-                PrefetchImages();
             });
-        }
-
-        private void PrefetchImages()
-        {
-            if (keyImage != null)
-            {
-                keyImage.Dispose();
-                keyImage = null;
-            }
-
-            if (currentMode == FocusState.WORK)
-            {
-                TryLoadCustomImage(settings.WorkImageFile);
-                if (keyImage == null)
-                {
-                    keyImage = Image.FromFile(DEFAULT_WORK_IMAGE);
-                }
-            }
-            else
-            {
-                TryLoadCustomImage(settings.BreakImageFile);
-                if (keyImage == null)
-                {
-                    keyImage = Image.FromFile(DEFAULT_BREAK_IMAGE);
-                }
-            }
-        }
-
-        private void TryLoadCustomImage(string fileName)
-        {
-            if (!String.IsNullOrEmpty(fileName))
-            {
-                if (!File.Exists(fileName))
-                {
-                    Logger.Instance.LogMessage(TracingLevel.ERROR, $"CustomImageFile does not exist {fileName}");
-
-                }
-                else
-                {
-                    keyImage = Image.FromFile(fileName);
-                }
-            }
         }
 
         private void PropagatePlaybackDevices()
@@ -646,27 +582,15 @@ namespace StreamTimer.Actions
             PropagatePlaybackDevices();
         }
 
-        private void SetFocusMode()
+        private async Task ResetAlert()
         {
-            switch (currentMode)
-            {
-                case FocusState.BREAK:
-                case FocusState.LONG_BREAK:
-                    currentMode = FocusState.WORK;
-                    break;
-                case FocusState.WORK:
-                    currentMode = FocusState.BREAK;
-                    cycleNumber = (cycleNumber + 1) % repeatAmount;
-                    if (cycleNumber == 0)
-                    {
-                        currentMode = FocusState.LONG_BREAK;
-                    }
-                    break;
-                default:
-                    Logger.Instance.LogMessage(TracingLevel.ERROR, $"Invalid Focus Mode {currentMode}");
-                    break;
-            }
-            SetTimerInterval();
+            isAlerting = false;
+            tmrAlert.Stop();
+            StopPlayback();
+            await Connection.SetImageAsync((string)null);
+            await Connection.SetTitleAsync(null);
+            SetRemainingInterval();
+
         }
 
         #endregion
