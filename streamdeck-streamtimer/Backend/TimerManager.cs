@@ -90,7 +90,8 @@ namespace StreamTimer.Backend
                     Filename = timerSettings.FileName,
                     FileTitlePrefix = timerSettings.FileTitlePrefix,
                     FileCountdownEndText = timerSettings.FileCountdownEndText,
-                    ClearFileOnReset = timerSettings.ClearFileOnReset
+                    ClearFileOnReset = timerSettings.ClearFileOnReset,
+                    TimeFormat = timerSettings.TimeFormat
                 };
             }
             else // We were paused, modify time left based on current time
@@ -129,11 +130,12 @@ namespace StreamTimer.Backend
             dicTimers[timerSettings.TimerId].FileCountdownEndText = timerSettings.FileCountdownEndText;
             dicTimers[timerSettings.TimerId].ClearFileOnReset = timerSettings.ClearFileOnReset;
             dicTimers[timerSettings.TimerId].PausedTimeLeft = 0;
+            dicTimers[timerSettings.TimerId].TimeFormat = timerSettings.TimeFormat;
             SaveTimers();
 
             if (timerSettings.ClearFileOnReset)
             {
-                SaveTimerToFile(timerSettings.FileName, String.Empty);
+                HelperUtils.WriteToFile(timerSettings.FileName, String.Empty);
             }
         }
 
@@ -195,22 +197,6 @@ namespace StreamTimer.Backend
             }
         }
 
-        private void SaveTimerToFile(string fileName, string text)
-        {
-            try
-            {
-                if (!String.IsNullOrWhiteSpace(fileName))
-                {
-
-                    File.WriteAllText(fileName, text);
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Instance.LogMessage(TracingLevel.ERROR, $"Error Saving value: {text} to counter file: {fileName} : {ex}");
-            }
-        }
-
         private void CheckWriteTimerToFile(string timerKey)
         {
             if (dicTimers[timerKey].IsEnabled)
@@ -221,7 +207,7 @@ namespace StreamTimer.Backend
 
         private void WriteCounterToFile(string timerKey)
         {
-            long total, minutes, seconds, hours;
+            long total;
             var counterData = dicTimers[timerKey];
 
             if (String.IsNullOrEmpty(counterData.Filename))
@@ -232,12 +218,12 @@ namespace StreamTimer.Backend
             total = SecondsLeft(timerKey);
             if (total <= 0 && !String.IsNullOrEmpty(counterData.FileCountdownEndText))
             {
-                SaveTimerToFile(counterData.Filename, counterData.FileCountdownEndText);
+                HelperUtils.WriteToFile(counterData.Filename, counterData.FileCountdownEndText.Replace(@"\n", "\n"));
                 return;
             }
             else if (total <= 0 && counterData.ClearFileOnReset)
             {
-                SaveTimerToFile(counterData.Filename, String.Empty);
+                HelperUtils.WriteToFile(counterData.Filename, String.Empty);
                 return;
             }
             else if (total < 0)
@@ -245,23 +231,18 @@ namespace StreamTimer.Backend
                 total = 0;
             }
 
-            minutes = total / 60;
-            seconds = total % 60;
-            hours = minutes / 60;
-            minutes %= 60;
-
-            string hoursStr = (hours > 0) ? $"{hours:0}:" : "";
-            SaveTimerToFile(counterData.Filename, $"{counterData.FileTitlePrefix}{hoursStr}{minutes:00}:{seconds:00}");
+            string output = HelperUtils.FormatTime(total, counterData.TimeFormat, false);
+            HelperUtils.WriteToFile(counterData.Filename, $"{counterData.FileTitlePrefix?.Replace(@"\n", "\n")}{output}");
         }
 
-        private int SecondsLeft(string counterKey)
+        private long SecondsLeft(string counterKey)
         {
             if (!dicTimers.ContainsKey(counterKey))
             {
                 return -1;
             }
 
-            return (int)(dicTimers[counterKey].EndTime - DateTime.Now).TotalSeconds;
+            return (long)(dicTimers[counterKey].EndTime - DateTime.Now).TotalSeconds;
         }
 
         private void SaveTimers()
@@ -281,8 +262,7 @@ namespace StreamTimer.Backend
             {
                 if (dicTimers[key].IsEnabled)
                 {
-                    int secondsLeft = SecondsLeft(key);
-                    if (secondsLeft < 0)
+                    if (SecondsLeft(key) < 0)
                     {
                         dicTimers[key].IsEnabled = false;
                         dicTimers[key].PausedTimeLeft = 0;

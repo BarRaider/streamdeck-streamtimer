@@ -21,5 +21,7 @@ namespace StreamTimer.Wrappers
         internal string FileCountdownEndText { get; set; }
 
         internal bool ClearFileOnReset { get; set; }
+
+        internal string TimeFormat { get; set; }
     }
 }

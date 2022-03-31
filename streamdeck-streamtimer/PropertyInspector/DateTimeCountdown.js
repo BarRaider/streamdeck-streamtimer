@@ -8,11 +8,7 @@
         // Received message from Stream Deck
         var jsonObj = JSON.parse(event.data);
 
-        if (jsonObj.event === 'sendToPropertyInspector') {
-            var payload = jsonObj.payload;
-            showHideSettings(payload);
-        }
-        else if (jsonObj.event === 'didReceiveSettings') {
+        if (jsonObj.event === 'didReceiveSettings') {
             var payload = jsonObj.payload;
             showHideSettings(payload.settings);
         }
@@ -22,16 +18,19 @@
 function showHideSettings(payload) {
     console.log("Show Hide Settings Called");
     setHourglass("none");
-    setStreamathon("none");
     setSoundOnEndSettings("none");
+
+    // Date/Time
+    showHideTimeOnly("none");
+    showHideDateTime("");
+    if (payload['countdownTimeOnly']) {
+        showHideTimeOnly("");
+        showHideDateTime("none");
+    }
+
     if (payload['hourglassMode']) {
         setHourglass("");
     }
-
-    if (payload['streamathonMode']) {
-        setStreamathon("");
-    }
-
     if (payload['playSoundOnEnd']) {
         setSoundOnEndSettings("");
     }
@@ -42,14 +41,19 @@ function setHourglass(displayValue) {
     dvHourglassSettings.style.display = displayValue;
 }
 
-function setStreamathon(displayValue) {
-    var dvStreamathonIncrement = document.getElementById('dvStreamathonIncrement');
-    var dvStreamathonMessage = document.getElementById('dvStreamathonMessage');
-    dvStreamathonIncrement.style.display = displayValue;
-    dvStreamathonMessage.style.display = displayValue;
-}
-
 function setSoundOnEndSettings(displayValue) {
     var dvSoundOnEndSettings = document.getElementById('dvSoundOnEndSettings');
     dvSoundOnEndSettings.style.display = displayValue;
+}
+
+function showHideTimeOnly(displayValue) {
+    console.log("showHideTimeOnly Called", displayValue);
+    var dvTimeOnly = document.getElementById('dvTimeOnly');
+    dvTimeOnly.style.display = displayValue;
+}
+
+function showHideDateTime(displayValue) {
+    console.log("showHideDateTime Called", displayValue);
+    var dvDateTime = document.getElementById('dvDateTime');
+    dvDateTime.style.display = displayValue;
 }

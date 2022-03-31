@@ -24,7 +24,7 @@ namespace StreamTimer.Actions
     // Icessassin - Tip: $20.02
     // onemousegaming - Tip: $3.50
     //---------------------------------------------------
-    public class StreamCountdownTimerAction : PluginBase
+    public class StreamTimerAction : PluginBase
     {
         private class PluginSettings
         {
@@ -52,6 +52,9 @@ namespace StreamTimer.Actions
                     HourglassTime = false,
                     HourglassImageMode = false,
                     AutoResetSeconds = DEFAULT_AUTO_RESET_SECONDS.ToString(),
+                    TimeFormat = HelperUtils.DEFAULT_TIME_FORMAT,
+                    KeyPrefix = String.Empty,
+                    CountUpOnEnd = false
                 };
 
                 return instance;
@@ -119,6 +122,15 @@ namespace StreamTimer.Actions
 
             [JsonProperty(PropertyName = "autoResetSeconds")]
             public string AutoResetSeconds { get; set; }
+
+            [JsonProperty(PropertyName = "timeFormat")]
+            public string TimeFormat { get; set; }
+
+            [JsonProperty(PropertyName = "keyPrefix")]
+            public string KeyPrefix { get; set; }
+
+            [JsonProperty(PropertyName = "countUpOnEnd")]
+            public bool CountUpOnEnd { get; set; }
         }
 
         #region Private members
@@ -148,7 +160,7 @@ namespace StreamTimer.Actions
 
         #region PluginBase Methods
 
-        public StreamCountdownTimerAction(SDConnection connection, InitialPayload payload) : base(connection, payload)
+        public StreamTimerAction(SDConnection connection, InitialPayload payload) : base(connection, payload)
         {
             if (payload.Settings == null || payload.Settings.Count == 0)
             {
@@ -180,9 +192,15 @@ namespace StreamTimer.Actions
         {
             bool clearOnReset = settings.ClearFileOnReset;
             string countdownEndText = settings.CountdownEndText;
+            string fileName = settings.TimerFileName;
             bool playSound = settings.PlaySoundOnEnd;
             // New in StreamDeck-Tools v2.0:
             Tools.AutoPopulateSettings(settings, payload.Settings);
+
+            if (fileName != settings.TimerFileName && !String.IsNullOrEmpty(settings.TimerFileName))
+            {
+                HelperUtils.WriteToFile(settings.TimerFileName, String.Empty);
+            }
 
             if (clearOnReset != settings.ClearFileOnReset)
             {
@@ -269,10 +287,17 @@ namespace StreamTimer.Actions
                 var endTime = TimerManager.Instance.GetTimerEndTime(timerId);
                 if (endTime > DateTime.MinValue)
                 {
-                    long timeElapsed = (long)(DateTime.Now - endTime).TotalSeconds;
-                    await ShowTimeOnKey(timeElapsed);
+                    long secondsElapsed = (long)(DateTime.Now - endTime).TotalSeconds;
+                    if (settings.CountUpOnEnd)
+                    {
+                        await ShowElapsedTimeOnKey(secondsElapsed);
+                    }
+                    else
+                    {
+                        await Connection.SetTitleAsync(null);
+                    }
 
-                    if (autoResetSeconds > 0 && timeElapsed > autoResetSeconds)
+                    if (autoResetSeconds > 0 && secondsElapsed > autoResetSeconds)
                     {
                         await ResetAlert();
                     }
@@ -331,22 +356,20 @@ namespace StreamTimer.Actions
 
         #region Private methods
 
-        private async Task ShowTimeOnKey(long total)
+        private async Task ShowElapsedTimeOnKey(long secondsPassed)
         {
-            long minutes, seconds, hours;
-            string delimiter = settings.Multiline ? "\n" : ":";
-            minutes = total / 60;
-            seconds = total % 60;
-            hours = minutes / 60;
-            minutes %= 60;
-
-            string hoursStr = (hours > 0) ? $"{hours:0}{delimiter}" : "";
-            string secondsDelimiter = delimiter;
-            if (!String.IsNullOrEmpty(hoursStr))
+            string output = HelperUtils.FormatTime(secondsPassed, "h:mm:ss", settings.Multiline);
+            await Connection.SetTitleAsync(output);
+        }
+        private async Task ShowTimeOnKey(long secondsLeft)
+        {
+            string output = HelperUtils.FormatTime(secondsLeft, settings.TimeFormat, settings.Multiline);
+            if (output == null)
             {
-                secondsDelimiter = "\n";
+                settings.TimeFormat = HelperUtils.DEFAULT_TIME_FORMAT;
+                await SaveSettings();
             }
-            await Connection.SetTitleAsync($"{hoursStr}{minutes:00}{secondsDelimiter}{seconds:00}");
+            await Connection.SetTitleAsync($"{settings.KeyPrefix?.Replace(@"\n", "\n")}{output}");
         }
 
         private void ResetTimer()
@@ -359,7 +382,8 @@ namespace StreamTimer.Actions
                 FileTitlePrefix = settings.FilePrefix,
                 ResetOnStart = !settings.ResumeOnClick,
                 FileCountdownEndText = settings.CountdownEndText,
-                ClearFileOnReset = settings.ClearFileOnReset
+                ClearFileOnReset = settings.ClearFileOnReset,
+                TimeFormat = settings.TimeFormat
             });
             highestTimerSeconds = (long)timerInterval.TotalSeconds;
         }
@@ -374,7 +398,8 @@ namespace StreamTimer.Actions
                 FileTitlePrefix = settings.FilePrefix,
                 ResetOnStart = !settings.ResumeOnClick,
                 FileCountdownEndText = settings.CountdownEndText,
-                ClearFileOnReset = settings.ClearFileOnReset
+                ClearFileOnReset = settings.ClearFileOnReset,
+                TimeFormat = settings.TimeFormat
             });
         }
 
@@ -420,7 +445,7 @@ namespace StreamTimer.Actions
             }
         }
 
-        private void SetTimerInterval()
+        private void SetRemainingInterval()
         {
             timerInterval = TimeSpan.Zero;
             if (!String.IsNullOrEmpty(settings.TimerInterval))
@@ -433,12 +458,28 @@ namespace StreamTimer.Actions
                 }
                 else
                 {
-                    highestTimerSeconds = (long)timerInterval.TotalSeconds;
-                    if (!TimerManager.Instance.IsTimerEnabled(timerId))
+                    // Fix since hours cannot be > 23 and it converts it to days...
+                    if (timerInterval.Days > 0)
                     {
-                        ResetTimer();
+                        var splitTime = settings.TimerInterval.Split(':');
+                        int hours = Int32.Parse(splitTime[0]);
+                        int minutes = Int32.Parse(splitTime[1]);
+                        int seconds = Int32.Parse(splitTime[2]);
+                        int days = hours / 24;
+                        hours %= 24;
+                        timerInterval = new TimeSpan(days, hours, minutes, seconds);
                     }
+                    TriggerTimerIntervalChange();
                 }
+            }
+        }
+
+        private void TriggerTimerIntervalChange()
+        {
+            highestTimerSeconds = (long)timerInterval.TotalSeconds;
+            if (!TimerManager.Instance.IsTimerEnabled(timerId))
+            {
+                ResetTimer();
             }
         }
 
@@ -559,7 +600,7 @@ namespace StreamTimer.Actions
                     retries--;
                     System.Threading.Thread.Sleep(1000);
                 }
-                SetTimerInterval();
+                SetRemainingInterval();
 
                 if (!Int32.TryParse(settings.AutoResetSeconds, out autoResetSeconds))
                 {
