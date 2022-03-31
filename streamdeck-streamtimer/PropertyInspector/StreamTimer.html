@@ -93,6 +93,13 @@
                 </div>
             </div>
         </div>
+        <div type="checkbox" class="sdpi-item" id="dvCountUpOnEnd">
+            <div class="sdpi-item-label">Count Up</div>
+            <div class="sdpi-item-value">
+                <input id="countUpOnEnd" type="checkbox" value="" class="sdProperty sdCheckbox" oninput="setSettings()">
+                <label for="countUpOnEnd" class="sdpi-item-label"><span></span>Start counting up when timer ends</label>
+            </div>
+        </div>
         <div type="checkbox" class="sdpi-item" id="dvClearFileOnReset">
             <div class="sdpi-item-label">Clear on Reset</div>
             <div class="sdpi-item-value">
@@ -107,6 +114,10 @@
                 <label for="resumeOnClick" class="sdpi-item-label"><span></span>Unpausing does not reset</label>
             </div>
         </div>
+        <hr />
+        <details class="message">
+            <summary>Display Modes:</summary>
+        </details>
         <div type="checkbox" class="sdpi-item" id="dvHourglassMode">
             <div class="sdpi-item-label">Hourglass mode</div>
             <div class="sdpi-item-value">

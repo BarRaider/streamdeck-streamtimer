@@ -45,7 +45,7 @@ namespace StreamTimer.Actions
                     PlaySoundOnEndFile = String.Empty,
                     HourglassTime = true,
                     WorkImageFile = null,
-                    BreakImageFile = null
+                    BreakImageFile = null,
                 };
 
                 return instance;

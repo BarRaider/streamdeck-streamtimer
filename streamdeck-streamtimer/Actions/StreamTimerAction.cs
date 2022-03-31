@@ -53,7 +53,8 @@ namespace StreamTimer.Actions
                     HourglassImageMode = false,
                     AutoResetSeconds = DEFAULT_AUTO_RESET_SECONDS.ToString(),
                     TimeFormat = HelperUtils.DEFAULT_TIME_FORMAT,
-                    KeyPrefix = String.Empty
+                    KeyPrefix = String.Empty,
+                    CountUpOnEnd = false
                 };
 
                 return instance;
@@ -127,6 +128,9 @@ namespace StreamTimer.Actions
 
             [JsonProperty(PropertyName = "keyPrefix")]
             public string KeyPrefix { get; set; }
+
+            [JsonProperty(PropertyName = "countUpOnEnd")]
+            public bool CountUpOnEnd { get; set; }
         }
 
         #region Private members
@@ -284,7 +288,14 @@ namespace StreamTimer.Actions
                 if (endTime > DateTime.MinValue)
                 {
                     long secondsElapsed = (long)(DateTime.Now - endTime).TotalSeconds;
-                    await ShowElapsedTimeOnKey(secondsElapsed);
+                    if (settings.CountUpOnEnd)
+                    {
+                        await ShowElapsedTimeOnKey(secondsElapsed);
+                    }
+                    else
+                    {
+                        await Connection.SetTitleAsync(null);
+                    }
 
                     if (autoResetSeconds > 0 && secondsElapsed > autoResetSeconds)
                     {

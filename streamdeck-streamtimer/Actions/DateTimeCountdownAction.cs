@@ -51,7 +51,8 @@ namespace StreamTimer.Actions
                     CountdownTime = DEFAULT_COUNTDOWN_TIME_INTERVAL,
                     CountdownDateTime = DEFAULT_COUNTDOWN_DATETIME_INTERVAL,
                     TimeFormat = HelperUtils.DEFAULT_TIME_FORMAT,
-                    KeyPrefix = String.Empty
+                    KeyPrefix = String.Empty,
+                    CountUpOnEnd = false
                 };
 
                 return instance;
@@ -115,6 +116,9 @@ namespace StreamTimer.Actions
 
             [JsonProperty(PropertyName = "keyPrefix")]
             public string KeyPrefix { get; set; }
+
+            [JsonProperty(PropertyName = "countUpOnEnd")]
+            public bool CountUpOnEnd { get; set; }
         }
 
         #region Private members
@@ -285,13 +289,18 @@ namespace StreamTimer.Actions
 
         private async Task ShowElapsedTimeOnKey()
         {
+            if (!settings.CountUpOnEnd)
+            {
+                await Connection.SetTitleAsync(null);
+                return;
+            }
             string output = HelperUtils.FormatTime((long)(DateTime.Now - endDateTime).TotalSeconds, "h:mm:ss", settings.Multiline);
             await Connection.SetTitleAsync(output);
 
             string fileOutput = "00:00";
             if (!String.IsNullOrEmpty(settings.CountdownEndText))
             {
-                fileOutput = settings.CountdownEndText;
+                fileOutput = settings.CountdownEndText.Replace(@"\n", "\n");
             }
             HelperUtils.WriteToFile(settings.TimerFileName, fileOutput);
         }
@@ -304,7 +313,7 @@ namespace StreamTimer.Actions
                 await SaveSettings();
             }
             await Connection.SetTitleAsync($"{settings.KeyPrefix?.Replace(@"\n", "\n")}{output}");
-            HelperUtils.WriteToFile(settings.TimerFileName, $"{settings.FilePrefix}{output.Replace("\n",":")}");
+            HelperUtils.WriteToFile(settings.TimerFileName, $"{settings.FilePrefix.Replace(@"\n", "\n")}{output.Replace("\n", ":")}");
         }
 
         private void SetRemainingInterval()

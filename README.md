@@ -4,6 +4,38 @@ Set a timer on your Stream Deck, and have it shown on your Stream too. Will star
 
 **Author's website and contact information:** [https://barraider.com](https://barraider.com)
 
+## New in v1.8
+- :new: `Date/Time Countdown` action - Let's you countdown to a specific date or time. 🔥
+- Added a new `Format` setting which allows you to customize the timer displayed on key (and file). 🔥
+- Added support for timer Prefix on keys
+- Both File Prefix and Key Prefix support newlines \n
+- Now customizable if timer starts counting up or not when timer ends
+- Minor bug fixes
+
+## Features
+- Countdown is written to file so you can display the remaining time on your stream
+- Supports adding a title prefix in the file (such as `Time left: `)
+- Timer starts flashing when time is up, you can choose the color of the alert
+- Hourglass mode creates a visual representation instead of a numeric timer
+- Countdown continues writing to the file even if you move to a different Stream Deck profile
+
+### Download
+
+* [Download plugin](https://github.com/BarRaider/streamdeck-streamtimer/releases/)
+
+## I found a bug, who do I contact?
+For support please contact the developer. Contact information is available at https://barraider.com
+
+## I have a feature request, who do I contact?
+Please contact the developer. Contact information is available at https://barraider.com
+
+## Dependencies
+* Uses StreamDeck-Tools by BarRaider: [![NuGet](https://img.shields.io/nuget/v/streamdeck-tools.svg?style=flat)](https://www.nuget.org/packages/streamdeck-tools)
+* Uses [Easy-PI](https://github.com/BarRaider/streamdeck-easypi) by BarRaider - Provides seamless integration with the Stream Deck PI (Property Inspector) 
+
+## Change Log
+
+
 ## New in v1.6
 - :new: `Focus Timer` action alternates between work and break intervals to improve your focus and get work done. 
 - `Auto Reset` feature allows you to reset the timer automatically after a customizable number of seconds
@@ -29,24 +61,3 @@ Set a timer on your Stream Deck, and have it shown on your Stream too. Will star
 - Hourglass Mode now shows an indication on whether the timer is running or paused on every keypress
 - Customizable text to show on stream when the timer ends
 - Option to clear the text file (and thus remove from stream) when the timer ends
-
-## Features
-- Countdown is written to file so you can display the remaining time on your stream
-- Supports adding a title prefix in the file (such as `Time left: `)
-- Timer starts flashing when time is up, you can choose the color of the alert
-- Hourglass mode creates a visual representation instead of a numeric timer
-- Countdown continues writing to the file even if you move to a different Stream Deck profile
-
-### Download
-
-* [Download plugin](https://github.com/BarRaider/streamdeck-streamtimer/releases/)
-
-## I found a bug, who do I contact?
-For support please contact the developer. Contact information is available at https://barraider.com
-
-## I have a feature request, who do I contact?
-Please contact the developer. Contact information is available at https://barraider.com
-
-## Dependencies
-* Uses StreamDeck-Tools by BarRaider: [![NuGet](https://img.shields.io/nuget/v/streamdeck-tools.svg?style=flat)](https://www.nuget.org/packages/streamdeck-tools)
-* Uses [Easy-PI](https://github.com/BarRaider/streamdeck-easypi) by BarRaider - Provides seamless integration with the Stream Deck PI (Property Inspector) 

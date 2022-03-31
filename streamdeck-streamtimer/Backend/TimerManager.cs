@@ -218,7 +218,7 @@ namespace StreamTimer.Backend
             total = SecondsLeft(timerKey);
             if (total <= 0 && !String.IsNullOrEmpty(counterData.FileCountdownEndText))
             {
-                HelperUtils.WriteToFile(counterData.Filename, counterData.FileCountdownEndText);
+                HelperUtils.WriteToFile(counterData.Filename, counterData.FileCountdownEndText.Replace(@"\n", "\n"));
                 return;
             }
             else if (total <= 0 && counterData.ClearFileOnReset)
@@ -232,7 +232,7 @@ namespace StreamTimer.Backend
             }
 
             string output = HelperUtils.FormatTime(total, counterData.TimeFormat, false);
-            HelperUtils.WriteToFile(counterData.Filename, $"{counterData.FileTitlePrefix}{output}");
+            HelperUtils.WriteToFile(counterData.Filename, $"{counterData.FileTitlePrefix?.Replace(@"\n", "\n")}{output}");
         }
 
         private long SecondsLeft(string counterKey)
