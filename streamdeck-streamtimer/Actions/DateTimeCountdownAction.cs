@@ -25,7 +25,7 @@ namespace StreamTimer.Actions
     // Icessassin - Tip: $20.02
     // onemousegaming - Tip: $3.50
     //---------------------------------------------------
-    public class DateTimeCountdownAction : PluginBase
+    public class DateTimeCountdownAction : KeypadBase
     {
         private class PluginSettings
         {
@@ -135,12 +135,9 @@ namespace StreamTimer.Actions
         private int alertStage = 0;
 
         private readonly PluginSettings settings;
-        private readonly string timerId;
 
         private long highestTimerSeconds;
-        private bool displayCurrentStatus = false;
         private Image pauseImage = null;
-        private bool stopPlayback = false;
         private int autoResetSeconds = DEFAULT_AUTO_RESET_SECONDS;
         private bool hadInputError = false;
 
@@ -161,7 +158,6 @@ namespace StreamTimer.Actions
             }
             Connection.OnPropertyInspectorDidAppear += Connection_OnPropertyInspectorDidAppear;
             Connection.OnSendToPlugin += Connection_OnSendToPlugin;
-            timerId = Connection.ContextId;
             tmrAlert.Interval = 200;
             tmrAlert.Elapsed += TmrAlert_Elapsed;
             InitializeSettings();
@@ -202,10 +198,6 @@ namespace StreamTimer.Actions
 
         public async override void KeyPressed(KeyPayload payload)
         {
-            if (settings.HourglassMode)
-            {
-                displayCurrentStatus = true;
-            }
             Logger.Instance.LogMessage(TracingLevel.INFO, "Key Pressed");
 
             if (isAlerting)
@@ -536,7 +528,6 @@ namespace StreamTimer.Actions
                     return;
                 }
 
-                stopPlayback = false;
                 if (String.IsNullOrEmpty(settings.PlaySoundOnEndFile) || string.IsNullOrEmpty(settings.PlaybackDevice))
                 {
                     Logger.Instance.LogMessage(TracingLevel.WARN, $"PlaySoundOnEnd called but File or Playback device are empty. File: {settings.PlaySoundOnEndFile} Device: {settings.PlaybackDevice}");
@@ -556,7 +547,10 @@ namespace StreamTimer.Actions
 
         private void StopPlayback()
         {
-            stopPlayback = true;
+            if (!string.IsNullOrEmpty(settings.PlaybackDevice))
+            {
+                AudioUtils.Common.StopStream(settings.PlaybackDevice);
+            }
         }
 
         private void Connection_OnSendToPlugin(object sender, BarRaider.SdTools.Wrappers.SDEventReceivedEventArgs<BarRaider.SdTools.Events.SendToPlugin> e)

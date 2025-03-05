@@ -11,6 +11,7 @@
         }
       ],
       "SupportedInMultiActions": true,
+      "UserTitleEnabled": false,
       "Tooltip": "Count down to a specific time or date/time",
       "UUID": "com.barraider.datetimecountdown",
       "PropertyInspectorPath": "PropertyInspector/DateTimeCountdown.html"
@@ -26,6 +27,7 @@
         }
       ],
       "SupportedInMultiActions": true,
+      "UserTitleEnabled": false,
       "Tooltip": "Use work/break alternating timings to manage your time and get things done",
       "UUID": "com.barraider.streamcountdowntimer.focustimer",
       "PropertyInspectorPath": "PropertyInspector/Focus.html"
@@ -41,6 +43,7 @@
         }
       ],
       "SupportedInMultiActions": true,
+      "UserTitleEnabled": false,
       "Tooltip": "Set a timer on your Stream Deck, and have it shown on your Stream too",
       "UUID": "com.barraider.streamcountdowntimer",
       "PropertyInspectorPath": "PropertyInspector/StreamTimer.html"
@@ -51,7 +54,7 @@
   "Name": "Stream Countdown Timer",
   "Icon": "Images/pluginIcon",
   "URL": "https://BarRaider.com/",
-  "Version": "1.8",
+  "Version": "1.9",
   "CodePath": "com.barraider.streamcountdowntimer",
   "Category": "Timer [BarRaider]",
   "CategoryIcon": "Images/categoryIcon",
@@ -63,6 +66,6 @@
   ],
   "SDKVersion": 2,
   "Software": {
-    "MinimumVersion": "4.9"
+    "MinimumVersion": "6.8.1"
   }
 }

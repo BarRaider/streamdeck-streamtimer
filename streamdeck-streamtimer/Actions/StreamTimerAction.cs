@@ -6,6 +6,7 @@ using StreamTimer.Wrappers;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Design;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -24,7 +25,7 @@ namespace StreamTimer.Actions
     // Icessassin - Tip: $20.02
     // onemousegaming - Tip: $3.50
     //---------------------------------------------------
-    public class StreamTimerAction : PluginBase
+    public class StreamTimerAction : KeypadBase
     {
         private class PluginSettings
         {
@@ -54,7 +55,8 @@ namespace StreamTimer.Actions
                     AutoResetSeconds = DEFAULT_AUTO_RESET_SECONDS.ToString(),
                     TimeFormat = HelperUtils.DEFAULT_TIME_FORMAT,
                     KeyPrefix = String.Empty,
-                    CountUpOnEnd = false
+                    CountUpOnEnd = false,
+                    SharedId = String.Empty,
                 };
 
                 return instance;
@@ -131,6 +133,9 @@ namespace StreamTimer.Actions
 
             [JsonProperty(PropertyName = "countUpOnEnd")]
             public bool CountUpOnEnd { get; set; }
+
+            [JsonProperty(PropertyName = "sharedId")]
+            public string SharedId { get; set; }
         }
 
         #region Private members
@@ -147,13 +152,12 @@ namespace StreamTimer.Actions
         private readonly PluginSettings settings;
         private bool keyPressed = false;
         private DateTime keyPressStart;
-        private readonly string timerId;
+        private string timerId;
         private TimeSpan timerInterval;
         private TimeSpan streamathonIncrement = TimeSpan.Zero;
         private long highestTimerSeconds;
         private bool displayCurrentStatus = false;
         private Image pauseImage = null;
-        private bool stopPlayback = false;
         private int autoResetSeconds = DEFAULT_AUTO_RESET_SECONDS;
 
         #endregion
@@ -592,6 +596,15 @@ namespace StreamTimer.Actions
 
         private void InitializeSettings()
         {
+            if (String.IsNullOrWhiteSpace(settings.SharedId))
+            {
+                timerId = Connection.ContextId;
+            }
+            else
+            {
+                timerId = settings.SharedId;
+            }
+
             Task.Run(() =>
             {
                 int retries = 60;
@@ -662,7 +675,6 @@ namespace StreamTimer.Actions
                     return;
                 }
 
-                stopPlayback = false;
                 if (String.IsNullOrEmpty(settings.PlaySoundOnEndFile) || string.IsNullOrEmpty(settings.PlaybackDevice))
                 {
                     Logger.Instance.LogMessage(TracingLevel.WARN, $"PlaySoundOnEnd called but File or Playback device are empty. File: {settings.PlaySoundOnEndFile} Device: {settings.PlaybackDevice}");
@@ -682,7 +694,10 @@ namespace StreamTimer.Actions
 
         private void StopPlayback()
         {
-            stopPlayback = true;
+            if (!string.IsNullOrEmpty(settings.PlaybackDevice))
+            {
+                AudioUtils.Common.StopStream(settings.PlaybackDevice);
+            }
         }
 
         private void Connection_OnSendToPlugin(object sender, BarRaider.SdTools.Wrappers.SDEventReceivedEventArgs<BarRaider.SdTools.Events.SendToPlugin> e)

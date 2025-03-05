@@ -20,7 +20,7 @@ namespace StreamTimer.Actions
     // Subscriber: Grumtastic
     //---------------------------------------------------   
     [PluginActionId("com.barraider.streamcountdowntimer.focustimer")]
-    public class FocusTimerAction : PluginBase
+    public class FocusTimerAction : KeypadBase
     {
         private class PluginSettings
         {
@@ -136,7 +136,6 @@ namespace StreamTimer.Actions
         private int repeatAmount = DEFAULT_REPEAT_AMOUNT;
         private bool displayCurrentStatus = false;
         private Image keyImage = null;
-        private bool stopPlayback = false;
         private FocusState currentMode = FocusState.WORK;
         private int cycleNumber = 0;
 
@@ -591,7 +590,6 @@ namespace StreamTimer.Actions
                     return;
                 }
 
-                stopPlayback = false;
                 if (String.IsNullOrEmpty(settings.PlaySoundOnEndFile) || string.IsNullOrEmpty(settings.PlaybackDevice))
                 {
                     Logger.Instance.LogMessage(TracingLevel.WARN, $"PlaySoundOnEnd called but File or Playback device are empty. File: {settings.PlaySoundOnEndFile} Device: {settings.PlaybackDevice}");
@@ -611,7 +609,10 @@ namespace StreamTimer.Actions
 
         private void StopPlayback()
         {
-            stopPlayback = true;
+            if (!string.IsNullOrEmpty(settings.PlaybackDevice))
+            {
+                AudioUtils.Common.StopStream(settings.PlaybackDevice);
+            }
         }
 
         private void Connection_OnSendToPlugin(object sender, BarRaider.SdTools.Wrappers.SDEventReceivedEventArgs<BarRaider.SdTools.Events.SendToPlugin> e)
