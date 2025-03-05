@@ -4,6 +4,10 @@ Set a timer on your Stream Deck, and have it shown on your Stream too. Will star
 
 **Author's website and contact information:** [https://barraider.com](https://barraider.com)
 
+## New in v1.9
+- :new: `Shared Id` feature allows you to view and control the same timer from different profiles and keys :fire:
+- Alert sound will now stop when pressing the key and resetting the timer
+
 ## New in v1.8
 - :new: `Date/Time Countdown` action - Let's you countdown to a specific date or time. 🔥
 - Added a new `Format` setting which allows you to customize the timer displayed on key (and file). 🔥
